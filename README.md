@@ -4,20 +4,17 @@ A weather card for [Home Assistant](https://www.home-assistant.io/) with an anim
 
 <!--
   SCREENSHOTS
-  Put your images in a folder (e.g. /images) in the repo and reference them here.
-  Replace the paths below with your own. A few good shots to include:
-    - the full card with the sun arc + bars
-    - the graph layout (daily)
-    - the hourly view
-    - the details grid
+  Main previews (row 1: daily, row 2: hourly) — keep the SAME theme for all four
+  so the comparison is about the layout, not the theme. Light theme reads best.
+  A light/dark pair is shown further down in the "Themes" section.
 -->
 <p align="center">
-  <img src="images/preview-bars.png" width="360" alt="Sun Weather Card – bars layout" />
-  <img src="images/preview-graph.png" width="360" alt="Sun Weather Card – graph layout" />
+  <img src="images/daily-bars.png" width="300" alt="Daily forecast – bars layout" />
+  <img src="images/daily-graph.png" width="300" alt="Daily forecast – graph layout" />
 </p>
 <p align="center">
-  <img src="images/preview-details.png" width="360" alt="Sun Weather Card – details" />
-  <img src="images/preview-hourly.png" width="360" alt="Sun Weather Card – hourly" />
+  <img src="images/hourly-bars.png" width="300" alt="Hourly forecast – bars layout" />
+  <img src="images/hourly-graph.png" width="300" alt="Hourly forecast – graph layout" />
 </p>
 
 ---
@@ -33,6 +30,17 @@ A weather card for [Home Assistant](https://www.home-assistant.io/) with an anim
 - **Multi‑language** – card content follows Italian, English, or your Home Assistant system language.
 - **Tap / hold / double‑tap actions** – standard Home Assistant actions (more‑info, navigate, url, perform‑action, toggle).
 - **UI editor** – configure everything without touching YAML.
+
+---
+
+## Themes
+
+The card automatically follows your Home Assistant theme — light or dark.
+
+<p align="center">
+  <img src="images/theme-light.png" width="300" alt="Light theme" />
+  <img src="images/theme-dark.png" width="300" alt="Dark theme" />
+</p>
 
 ---
 
