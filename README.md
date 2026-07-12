@@ -4,17 +4,17 @@ A weather card for [Home Assistant](https://www.home-assistant.io/) with an anim
 
 <!--
   SCREENSHOTS
-  Main previews (row 1: daily, row 2: hourly) — keep the SAME theme for all four
-  so the comparison is about the layout, not the theme. Light theme reads best.
+  Row 1: bars layout (daily + hourly). Row 2: graph layout (daily + hourly).
+  Grouping by layout keeps the proportions consistent within each row.
   A light/dark pair is shown further down in the "Themes" section.
 -->
 <p align="center">
-  <img src="images/daily-bars.png" width="300" alt="Daily forecast – bars layout" />
-  <img src="images/hourly-bars.png" width="300" alt="Hourly forecast – bars layout" />
+  <img src="images/daily-bars.png" width="300" alt="Bars layout – daily forecast" />
+  <img src="images/hourly-bars.png" width="300" alt="Bars layout – hourly forecast" />
 </p>
 <p align="center">
-  <img src="images/daily-graph.png" width="300" alt="Daily forecast – graph layout" />
-  <img src="images/hourly-graph.png" width="300" alt="Hourly forecast – graph layout" />
+  <img src="images/daily-graph.png" width="300" alt="Graph layout – daily forecast" />
+  <img src="images/hourly-graph.png" width="300" alt="Graph layout – hourly forecast" />
 </p>
 
 ---
@@ -29,6 +29,7 @@ A weather card for [Home Assistant](https://www.home-assistant.io/) with an anim
 - **Original animated SVG icons** for sun, moon, clouds, rain, snow, fog, wind and lightning. No external assets.
 - **Multi‑language** – card content follows Italian, English, or your Home Assistant system language.
 - **Tap / hold / double‑tap actions** – standard Home Assistant actions (more‑info, navigate, url, perform‑action, toggle).
+- **Show only what you need** – time, date and the sun arc can each be turned on or off, and you choose exactly which detail attributes to display.
 - **UI editor** – configure everything without touching YAML.
 
 ---
