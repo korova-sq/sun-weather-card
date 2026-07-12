@@ -10,10 +10,10 @@ A weather card for [Home Assistant](https://www.home-assistant.io/) with an anim
 -->
 <p align="center">
   <img src="images/daily-bars.png" width="300" alt="Daily forecast – bars layout" />
-  <img src="images/daily-graph.png" width="300" alt="Daily forecast – graph layout" />
+  <img src="images/hourly-bars.png" width="300" alt="Hourly forecast – bars layout" />
 </p>
 <p align="center">
-  <img src="images/hourly-bars.png" width="300" alt="Hourly forecast – bars layout" />
+  <img src="images/daily-graph.png" width="300" alt="Daily forecast – graph layout" />
   <img src="images/hourly-graph.png" width="300" alt="Hourly forecast – graph layout" />
 </p>
 
