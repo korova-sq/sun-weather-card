@@ -1,7 +1,7 @@
 /**
  * Sun Weather Card
  * https://github.com/korova-sq/sun-weather-card
- * Version: 1.0.0
+ * Version: 1.1.0
  *
  * A weather card with an animated current-conditions header, a sunrise/sunset
  * arc, and daily/hourly forecasts shown as iOS-style bars or a line graph.
@@ -93,6 +93,15 @@ class SunWeatherCard extends HTMLElement {
       // quante righe di previsione restano sempre visibili; le altre
       // diventano scrollabili verticalmente. null = mostra tutte senza scroll.
       visible_rows: null,
+      // sfondo: 'transparent' rimuove sfondo, ombra e bordo (la card si fonde
+      // con la dashboard). 'background_image' imposta un'immagine di sfondo
+      // (URL o percorso /local/...). Con l'immagine, un velo automatico
+      // preserva la leggibilita' del testo.
+      transparent: false,
+      background_image: null,
+      // velo sopra l'immagine di sfondo, valore unico da -1 a +1:
+      //  -1 = chiaro pieno, 0 = nessun velo, +1 = scuro pieno.
+      background_overlay: 0,
       ...config,
     };
     // dettagli: se la chiave e' omessa NON mostrare nulla di default
@@ -120,8 +129,43 @@ class SunWeatherCard extends HTMLElement {
         ha-card {
           padding: 16px 18px 18px;
           font-family: var(--paper-font-body1_-_font-family, inherit);
+          position: relative;
         }
         ha-card.clickable { cursor: pointer; }
+        /* sfondo trasparente totale: via sfondo, ombra e bordo */
+        ha-card.transparent {
+          background: transparent !important;
+          box-shadow: none !important;
+          border: none !important;
+          --ha-card-background: transparent;
+          --ha-card-box-shadow: none;
+          --ha-card-border-width: 0;
+        }
+        /* immagine di sfondo: dipinta sulla card stessa (card normale, nessun
+           wrapper che spunta agli angoli). Il velo e' incorporato nel background. */
+        ha-card.has-bg-image {
+          background-size: cover;
+          background-position: center;
+          background-repeat: no-repeat;
+          border: none !important;
+          --ha-card-border-width: 0;
+          overflow: hidden;
+        }
+        /* su velo scuro schiarisce i testi che di default sono scuri */
+        ha-card.bg-dark .time,
+        ha-card.bg-dark .cur-desc,
+        ha-card.bg-dark .cur-temp,
+        ha-card.bg-dark .date,
+        ha-card.bg-dark .cur-location,
+        ha-card.bg-dark .cur-hilo,
+        ha-card.bg-dark .detail-item,
+        ha-card.bg-dark .forecast-row,
+        ha-card.bg-dark .fc-graph .g-day,
+        ha-card.bg-dark .fc-graph .g-tmax,
+        ha-card.bg-dark .fc-graph .g-tmin {
+          color: #f3f3f3;
+          fill: #f3f3f3;
+        }
         .header {
           display: flex;
           justify-content: space-between;
@@ -314,6 +358,8 @@ class SunWeatherCard extends HTMLElement {
           overflow-y: hidden;
           padding-right: 0;
           scrollbar-width: none;
+          -webkit-mask-image: linear-gradient(to right, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
+          mask-image: linear-gradient(to right, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
         }
         .forecast-scroll.graph-mode::-webkit-scrollbar { height: 0; display: none; }
         .fc-graph { display: block; flex: none; overflow: visible; }
@@ -599,6 +645,31 @@ class SunWeatherCard extends HTMLElement {
     if (cardEl) {
       const act = (this._config.tap_action && this._config.tap_action.action) || 'more-info';
       cardEl.classList.toggle('clickable', act !== 'none');
+
+      // sfondo trasparente
+      cardEl.classList.toggle('transparent', this._config.transparent === true);
+
+      // immagine di sfondo con velo incorporato, dipinta sulla card stessa
+      const bg = this._config.background_image;
+      if (bg) {
+        cardEl.classList.add('has-bg-image');
+
+        // velo unico: valore da -1 (chiaro) a +1 (scuro), 0 = nessun velo
+        let ov = Number(this._config.background_overlay);
+        if (!isFinite(ov)) ov = 0;
+        ov = Math.min(Math.max(ov, -1), 1);
+        const dark = ov > 0;
+        const op = Math.abs(ov);
+        const veil = dark ? `rgba(0, 0, 0, ${op})` : `rgba(255, 255, 255, ${op})`;
+        // velo come primo layer (gradiente pieno) sopra l'immagine
+        const bgUrl = String(bg).trim();
+        cardEl.style.backgroundImage =
+          `linear-gradient(${veil}, ${veil}), url("${bgUrl}")`;
+        cardEl.classList.toggle('bg-dark', dark && op >= 0.4);
+      } else {
+        cardEl.classList.remove('has-bg-image', 'bg-dark');
+        cardEl.style.backgroundImage = '';
+      }
     }
 
     timeEl.textContent = timeFmt.format(now);
@@ -1074,6 +1145,21 @@ class SunWeatherCard extends HTMLElement {
     this._applyScroll(list, hours.length);
   }
 
+  // Estende una serie di punti fino ai bordi (x=0 e x=w) prolungando
+  // leggermente la pendenza iniziale/finale, cosi' la linea entra ed esce
+  // dai bordi (poi la maschera la sfuma).
+  _extendToEdges(pts, w) {
+    if (!pts || pts.length < 2) return pts || [];
+    const first = pts[0], second = pts[1];
+    const last = pts[pts.length - 1], prev = pts[pts.length - 2];
+    // pendenza agli estremi
+    const slopeL = (second[1] - first[1]) / (second[0] - first[0] || 1);
+    const slopeR = (last[1] - prev[1]) / (last[0] - prev[0] || 1);
+    const startY = first[1] - slopeL * first[0];
+    const endY = last[1] + slopeR * (w - last[0]);
+    return [[0, startY], ...pts, [w, endY]];
+  }
+
   // Grafico orizzontale. hourly=false: due linee max/min per giorno.
   // hourly=true: una linea temperatura per ora, con l'ora sotto.
   _renderForecastGraph(hourly) {
@@ -1157,11 +1243,11 @@ class SunWeatherCard extends HTMLElement {
       return d;
     };
 
-    const lineMax = smooth(ptsMax);
-    const lineMin = hourly ? '' : smooth(ptsMin);
-    // area sfumata sotto la linea max
+    const lineMax = smooth(this._extendToEdges(ptsMax, w));
+    const lineMin = hourly ? '' : smooth(this._extendToEdges(ptsMin, w));
+    // area sfumata sotto la linea max (segue la linea estesa fino ai bordi)
     const areaBottom = bandTop + bandH + 2;
-    const areaMax = `${lineMax} L ${ptsMax[ptsMax.length - 1][0].toFixed(1)} ${areaBottom} L ${ptsMax[0][0].toFixed(1)} ${areaBottom} Z`;
+    const areaMax = `${lineMax} L ${w} ${areaBottom} L 0 ${areaBottom} Z`;
 
     const dayLabels = days.map((d, i) =>
       `<text class="g-day" x="${x(i)}" y="${yDay}" text-anchor="middle">${colLabel(d)}</text>`
@@ -1484,14 +1570,105 @@ const ALL_DETAILS = [
 ];
 const DETAIL_LABELS = Object.fromEntries(ALL_DETAILS);
 
-const TAP_ACTIONS = [
-  ['more-info', 'Entity info'],
-  ['navigate', 'Navigate'],
-  ['url', 'URL'],
-  ['perform-action', 'Perform action'],
-  ['toggle', 'Toggle'],
-  ['none', 'Nothing'],
-];
+const TAP_ACTIONS = ['more-info', 'navigate', 'url', 'perform-action', 'toggle', 'none'];
+
+// Traduzioni dell'editor (it/en). L'editor segue la lingua di Home Assistant.
+const EDITOR_I18N = {
+  en: {
+    entities: 'Entities',
+    weather_entity: 'Weather entity',
+    sun_entity: 'Sun entity (sunrise/sunset arc)',
+    appearance: 'Appearance',
+    location: 'Location name (empty = automatic)',
+    language: 'Language',
+    lang_system: 'System', lang_it: 'Italiano', lang_en: 'English',
+    time_format: 'Time format',
+    tf_24: '24 hours', tf_12: '12 hours',
+    show_time: 'Show time',
+    show_date: 'Show date',
+    show_arc: 'Show sun arc',
+    transparent: 'Transparent background',
+    background_image: 'Background image (URL or /local/… path)',
+    overlay: 'Overlay: lighter ⟵ none ⟶ darker',
+    ov_lighter: 'Lighter', ov_zero: '0', ov_darker: 'Darker',
+    forecast: 'Forecast',
+    forecast_type: 'Forecast type',
+    ft_daily: 'Daily', ft_hourly: 'Hourly',
+    daily_layout: 'Daily layout',
+    dl_bars: 'Bars', dl_graph: 'Graph (lines)',
+    days_to_load: 'Days to load',
+    hours_to_load: 'Hours to load',
+    visible_rows: 'Visible rows (empty = all)',
+    show_rain: 'Show daily rain (mm)',
+    show_toggle: 'Daily/Hourly toggle in card',
+    details: 'Details',
+    details_hint: 'Add attributes below. Drag the chips to reorder. Tap ✕ to remove.',
+    details_empty: 'No details yet. Add attributes below.',
+    all_added: '— all added —',
+    interaction: 'Interaction',
+    tap_behavior: 'Tap behavior',
+    hold_behavior: 'Hold behavior',
+    double_tap_behavior: 'Double tap behavior',
+    nav_path: 'Navigation path',
+    url_label: 'URL',
+    action_srv: 'Action (domain.service)',
+    act_more_info: 'Entity info', act_navigate: 'Navigate', act_url: 'URL',
+    act_perform: 'Perform action', act_toggle: 'Toggle', act_none: 'Nothing',
+    det_humidity: 'Humidity', det_pressure: 'Pressure', det_wind_speed: 'Wind speed',
+    det_wind_bearing: 'Wind direction', det_precipitation: 'Precipitation (mm)',
+    det_precipitation_probability: 'Precip. probability', det_sunrise: 'Sunrise',
+    det_sunset: 'Sunset', det_visibility: 'Visibility',
+    det_apparent_temperature: 'Apparent temp.', det_cloud_coverage: 'Cloud coverage',
+    det_uv_index: 'UV index', det_dew_point: 'Dew point',
+  },
+  it: {
+    entities: 'Entità',
+    weather_entity: 'Entità meteo',
+    sun_entity: 'Entità sole (arco alba/tramonto)',
+    appearance: 'Aspetto',
+    location: 'Nome località (vuoto = automatico)',
+    language: 'Lingua',
+    lang_system: 'Sistema', lang_it: 'Italiano', lang_en: 'English',
+    time_format: 'Formato ora',
+    tf_24: '24 ore', tf_12: '12 ore',
+    show_time: 'Mostra orario',
+    show_date: 'Mostra data',
+    show_arc: 'Mostra arco del sole',
+    transparent: 'Sfondo trasparente',
+    background_image: 'Immagine di sfondo (URL o percorso /local/…)',
+    overlay: 'Velo: più chiaro ⟵ niente ⟶ più scuro',
+    ov_lighter: 'Chiaro', ov_zero: '0', ov_darker: 'Scuro',
+    forecast: 'Previsioni',
+    forecast_type: 'Tipo previsione',
+    ft_daily: 'Giornaliera', ft_hourly: 'Oraria',
+    daily_layout: 'Layout giornaliero',
+    dl_bars: 'Barre', dl_graph: 'Grafico (linee)',
+    days_to_load: 'Giorni da caricare',
+    hours_to_load: 'Ore da caricare',
+    visible_rows: 'Righe visibili (vuoto = tutte)',
+    show_rain: 'Mostra pioggia giornaliera (mm)',
+    show_toggle: 'Interruttore Giorni/Ore nella card',
+    details: 'Dettagli',
+    details_hint: 'Aggiungi attributi qui sotto. Trascina i chip per riordinare. Tocca ✕ per rimuovere.',
+    details_empty: 'Nessun dettaglio. Aggiungine qui sotto.',
+    all_added: '— tutti aggiunti —',
+    interaction: 'Interazione',
+    tap_behavior: 'Al tocco',
+    hold_behavior: 'Alla pressione prolungata',
+    double_tap_behavior: 'Al doppio tocco',
+    nav_path: 'Percorso di navigazione',
+    url_label: 'URL',
+    action_srv: 'Azione (dominio.servizio)',
+    act_more_info: 'Info entità', act_navigate: 'Naviga', act_url: 'URL',
+    act_perform: 'Esegui azione', act_toggle: 'Commuta', act_none: 'Niente',
+    det_humidity: 'Umidità', det_pressure: 'Pressione', det_wind_speed: 'Velocità vento',
+    det_wind_bearing: 'Direzione vento', det_precipitation: 'Precipitazioni (mm)',
+    det_precipitation_probability: 'Prob. precipitazioni', det_sunrise: 'Alba',
+    det_sunset: 'Tramonto', det_visibility: 'Visibilità',
+    det_apparent_temperature: 'Temp. percepita', det_cloud_coverage: 'Copertura nuvolosa',
+    det_uv_index: 'Indice UV', det_dew_point: 'Punto di rugiada',
+  },
+};
 
 class SunWeatherCardEditor extends HTMLElement {
   setConfig(config) {
@@ -1504,8 +1681,39 @@ class SunWeatherCardEditor extends HTMLElement {
   }
 
   set hass(hass) {
+    const first = !this._hass;
     this._hass = hass;
-    this._fillEntityPickers();
+    // primo hass: ri-renderizza per applicare la lingua di HA alle etichette
+    if (first && this._rendered) {
+      this._render();
+    } else {
+      this._fillEntityPickers();
+    }
+  }
+
+  // lingua editor: segue HA/browser; 'it' -> italiano, altrimenti inglese
+  _lang() {
+    const l = (this._hass && this._hass.locale && this._hass.locale.language)
+      || (this._hass && this._hass.language)
+      || navigator.language || 'en';
+    return String(l).toLowerCase().startsWith('it') ? 'it' : 'en';
+  }
+
+  t(key) {
+    const dict = EDITOR_I18N[this._lang()] || EDITOR_I18N.en;
+    return dict[key] != null ? dict[key] : (EDITOR_I18N.en[key] || key);
+  }
+
+  _detailLabel(k) {
+    return this.t('det_' + k) || DETAIL_LABELS[k] || k;
+  }
+
+  _actionLabel(a) {
+    const map = {
+      'more-info': 'act_more_info', 'navigate': 'act_navigate', 'url': 'act_url',
+      'perform-action': 'act_perform', 'toggle': 'act_toggle', 'none': 'act_none',
+    };
+    return this.t(map[a] || a);
   }
 
   _emit() {
@@ -1593,6 +1801,35 @@ class SunWeatherCardEditor extends HTMLElement {
           box-sizing: border-box;
         }
         .inline select, .inline input { width: auto; min-width: 130px; }
+        .ov-slider { position: relative; display: flex; align-items: center; }
+        .ov-slider .ov-tick {
+          position: absolute; left: 50%; top: 50%;
+          width: 2px; height: 16px; transform: translate(-50%, -50%);
+          background: var(--primary-text-color, #333); opacity: 0.55;
+          border-radius: 1px; pointer-events: none; z-index: 2;
+        }
+        .ov-scale {
+          display: flex; justify-content: space-between;
+          font-size: 0.72em; color: var(--secondary-text-color); margin-top: 2px;
+        }
+        input[type="range"]#background_overlay {
+          -webkit-appearance: none; appearance: none;
+          width: 100%; height: 8px; border-radius: 999px; padding: 0;
+          border: 1px solid var(--divider-color, #ccc);
+          background: linear-gradient(to right, #ffffff, #d9d9d9 50%, #000000);
+          cursor: pointer;
+        }
+        input[type="range"]#background_overlay::-webkit-slider-thumb {
+          -webkit-appearance: none; appearance: none;
+          width: 18px; height: 18px; border-radius: 50%;
+          background: var(--primary-color, #03a9f4);
+          border: 2px solid #fff; box-shadow: 0 0 2px rgba(0,0,0,0.4);
+        }
+        input[type="range"]#background_overlay::-moz-range-thumb {
+          width: 18px; height: 18px; border-radius: 50%;
+          background: var(--primary-color, #03a9f4);
+          border: 2px solid #fff;
+        }
         .switch { display: flex; align-items: center; gap: 8px; color: var(--primary-text-color); font-size: 0.9em; }
         .hint { font-size: 0.78em; color: var(--secondary-text-color); }
 
@@ -1626,95 +1863,110 @@ class SunWeatherCardEditor extends HTMLElement {
       <div class="editor">
 
         <details class="group" open>
-          <summary>Entities</summary>
+          <summary>${this.t('entities')}</summary>
           <div class="grp-body">
             <div class="row">
-              <label>Weather entity</label>
+              <label>${this.t('weather_entity')}</label>
               <select id="entity"></select>
             </div>
             <div class="row">
-              <label>Sun entity (sunrise/sunset arc)</label>
+              <label>${this.t('sun_entity')}</label>
               <select id="sun_entity"></select>
             </div>
           </div>
         </details>
 
         <details class="group">
-          <summary>Appearance</summary>
+          <summary>${this.t('appearance')}</summary>
           <div class="grp-body">
             <div class="row">
-              <label>Location name (empty = automatic)</label>
+              <label>${this.t('location')}</label>
               <input type="text" id="location" value="${c.location || ''}" placeholder="automatic">
             </div>
             <div class="row inline">
-              <label>Language</label>
+              <label>${this.t('language')}</label>
               <select id="language">
-                <option value="system" ${lang === 'system' ? 'selected' : ''}>System</option>
-                <option value="it" ${lang === 'it' ? 'selected' : ''}>Italiano</option>
-                <option value="en" ${lang === 'en' ? 'selected' : ''}>English</option>
+                <option value="system" ${lang === 'system' ? 'selected' : ''}>${this.t('lang_system')}</option>
+                <option value="it" ${lang === 'it' ? 'selected' : ''}>${this.t('lang_it')}</option>
+                <option value="en" ${lang === 'en' ? 'selected' : ''}>${this.t('lang_en')}</option>
               </select>
             </div>
             <div class="row inline">
-              <label>Time format</label>
+              <label>${this.t('time_format')}</label>
               <select id="time_format">
-                <option value="24" ${tf === '24' ? 'selected' : ''}>24 hours</option>
-                <option value="12" ${tf === '12' ? 'selected' : ''}>12 hours</option>
+                <option value="24" ${tf === '24' ? 'selected' : ''}>${this.t('tf_24')}</option>
+                <option value="12" ${tf === '12' ? 'selected' : ''}>${this.t('tf_12')}</option>
               </select>
             </div>
             <div class="row inline">
-              <label class="switch"><input type="checkbox" id="show_time" ${c.show_time !== false ? 'checked' : ''}> Show time</label>
+              <label class="switch"><input type="checkbox" id="show_time" ${c.show_time !== false ? 'checked' : ''}> ${this.t('show_time')}</label>
             </div>
             <div class="row inline">
-              <label class="switch"><input type="checkbox" id="show_date" ${c.show_date !== false ? 'checked' : ''}> Show date</label>
+              <label class="switch"><input type="checkbox" id="show_date" ${c.show_date !== false ? 'checked' : ''}> ${this.t('show_date')}</label>
             </div>
             <div class="row inline">
-              <label class="switch"><input type="checkbox" id="show_arc" ${c.show_arc !== false ? 'checked' : ''}> Show sun arc</label>
+              <label class="switch"><input type="checkbox" id="show_arc" ${c.show_arc !== false ? 'checked' : ''}> ${this.t('show_arc')}</label>
+            </div>
+            <div class="row inline">
+              <label class="switch"><input type="checkbox" id="transparent" ${c.transparent === true ? 'checked' : ''}> ${this.t('transparent')}</label>
+            </div>
+            <div class="row">
+              <label>${this.t('background_image')}</label>
+              <input type="text" id="background_image" value="${c.background_image || ''}" placeholder="/local/bg.jpg">
+            </div>
+            <div class="row">
+              <label>${this.t('overlay')}</label>
+              <div class="ov-slider">
+                <span class="ov-tick"></span>
+                <input type="range" id="background_overlay" min="-1" max="1" step="0.05" value="${c.background_overlay ?? 0}">
+              </div>
+              <div class="ov-scale"><span>${this.t('ov_lighter')}</span><span>${this.t('ov_zero')}</span><span>${this.t('ov_darker')}</span></div>
             </div>
           </div>
         </details>
 
         <details class="group">
-          <summary>Forecast</summary>
+          <summary>${this.t('forecast')}</summary>
           <div class="grp-body">
             <div class="row inline">
-              <label>Forecast type</label>
+              <label>${this.t('forecast_type')}</label>
               <select id="forecast_type">
-                <option value="daily" ${ft === 'daily' ? 'selected' : ''}>Daily</option>
-                <option value="hourly" ${ft === 'hourly' ? 'selected' : ''}>Hourly</option>
+                <option value="daily" ${ft === 'daily' ? 'selected' : ''}>${this.t('ft_daily')}</option>
+                <option value="hourly" ${ft === 'hourly' ? 'selected' : ''}>${this.t('ft_hourly')}</option>
               </select>
             </div>
             <div class="row inline">
-              <label>Daily layout</label>
+              <label>${this.t('daily_layout')}</label>
               <select id="forecast_layout">
-                <option value="bars" ${(c.forecast_layout || 'bars') === 'bars' ? 'selected' : ''}>Bars</option>
-                <option value="graph" ${c.forecast_layout === 'graph' ? 'selected' : ''}>Graph (lines)</option>
+                <option value="bars" ${(c.forecast_layout || 'bars') === 'bars' ? 'selected' : ''}>${this.t('dl_bars')}</option>
+                <option value="graph" ${c.forecast_layout === 'graph' ? 'selected' : ''}>${this.t('dl_graph')}</option>
               </select>
             </div>
             <div class="row inline">
-              <label>Days to load</label>
+              <label>${this.t('days_to_load')}</label>
               <input type="number" id="forecast_days" min="1" max="15" value="${c.forecast_days ?? 7}">
             </div>
             <div class="row inline">
-              <label>Hours to load</label>
+              <label>${this.t('hours_to_load')}</label>
               <input type="number" id="forecast_hours" min="1" max="48" value="${c.forecast_hours ?? 24}">
             </div>
             <div class="row inline">
-              <label>Visible rows (empty = all)</label>
+              <label>${this.t('visible_rows')}</label>
               <input type="number" id="visible_rows" min="1" max="15" value="${c.visible_rows ?? ''}" placeholder="all">
             </div>
             <div class="row inline">
-              <label class="switch"><input type="checkbox" id="show_forecast_precipitation" ${c.show_forecast_precipitation !== false ? 'checked' : ''}> Show daily rain (mm)</label>
+              <label class="switch"><input type="checkbox" id="show_forecast_precipitation" ${c.show_forecast_precipitation !== false ? 'checked' : ''}> ${this.t('show_rain')}</label>
             </div>
             <div class="row inline">
-              <label class="switch"><input type="checkbox" id="show_forecast_toggle" ${c.show_forecast_toggle ? 'checked' : ''}> Daily/Hourly toggle in card</label>
+              <label class="switch"><input type="checkbox" id="show_forecast_toggle" ${c.show_forecast_toggle ? 'checked' : ''}> ${this.t('show_toggle')}</label>
             </div>
           </div>
         </details>
 
         <details class="group">
-          <summary>Details</summary>
+          <summary>${this.t('details')}</summary>
           <div class="grp-body">
-            <div class="hint">Add attributes below. Drag the chips to reorder. Tap \u2715 to remove.</div>
+            <div class="hint">${this.t('details_hint')}</div>
             <div class="det-active" id="det-active"></div>
             <div class="det-add">
               <select id="det-add-select"></select>
@@ -1724,20 +1976,20 @@ class SunWeatherCardEditor extends HTMLElement {
         </details>
 
         <details class="group">
-          <summary>Interaction</summary>
+          <summary>${this.t('interaction')}</summary>
           <div class="grp-body">
             <div class="row inline">
-              <label>Tap behavior</label>
+              <label>${this.t('tap_behavior')}</label>
               <select id="tap_action_type"></select>
             </div>
             <div class="row" id="tap_extra"></div>
             <div class="row inline">
-              <label>Hold behavior</label>
+              <label>${this.t('hold_behavior')}</label>
               <select id="hold_action_type"></select>
             </div>
             <div class="row" id="hold_extra"></div>
             <div class="row inline">
-              <label>Double tap behavior</label>
+              <label>${this.t('double_tap_behavior')}</label>
               <select id="double_tap_action_type"></select>
             </div>
             <div class="row" id="double_tap_extra"></div>
@@ -1768,6 +2020,9 @@ class SunWeatherCardEditor extends HTMLElement {
     bind('show_time', 'change', (e) => this._set('show_time', e.target.checked));
     bind('show_date', 'change', (e) => this._set('show_date', e.target.checked));
     bind('show_arc', 'change', (e) => this._set('show_arc', e.target.checked));
+    bind('transparent', 'change', (e) => this._set('transparent', e.target.checked));
+    bind('background_image', 'input', (e) => this._set('background_image', e.target.value));
+    bind('background_overlay', 'input', (e) => this._set('background_overlay', Number(e.target.value)));
     bind('forecast_type', 'change', (e) => this._set('forecast_type', e.target.value));
     bind('forecast_layout', 'change', (e) => this._set('forecast_layout', e.target.value));
     bind('forecast_days', 'input', (e) => this._set('forecast_days', e.target.value === '' ? '' : Number(e.target.value)));
@@ -1800,10 +2055,10 @@ class SunWeatherCardEditor extends HTMLElement {
       box.innerHTML = active.length
         ? active.map((key, i) => `
           <span class="det-chip" draggable="true" data-index="${i}">
-            ${DETAIL_LABELS[key] || key}
+            ${this._detailLabel(key)}
             <button type="button" data-remove="${i}" title="Remove">\u2715</button>
           </span>`).join('')
-        : `<div class="det-empty">No details yet. Add attributes below.</div>`;
+        : `<div class="det-empty">${this.t('details_empty')}</div>`;
 
       box.querySelectorAll('button[data-remove]').forEach((b) =>
         b.addEventListener('click', (e) => { e.stopPropagation(); this._removeDetail(+b.dataset.remove); }));
@@ -1814,8 +2069,8 @@ class SunWeatherCardEditor extends HTMLElement {
     if (sel) {
       const avail = ALL_DETAILS.filter(([k]) => !active.includes(k));
       sel.innerHTML = avail.length
-        ? avail.map(([k, label]) => `<option value="${k}">${label}</option>`).join('')
-        : `<option value="">\u2014 all added \u2014</option>`;
+        ? avail.map(([k]) => `<option value="${k}">${this._detailLabel(k)}</option>`).join('')
+        : `<option value="">${this.t('all_added')}</option>`;
     }
   }
 
@@ -1881,8 +2136,8 @@ class SunWeatherCardEditor extends HTMLElement {
     const type = act.action || (key === 'tap_action' ? 'more-info' : 'none');
 
     if (typeSel && !typeSel.dataset.filled) {
-      typeSel.innerHTML = TAP_ACTIONS.map(([v, label]) =>
-        `<option value="${v}" ${v === type ? 'selected' : ''}>${label}</option>`).join('');
+      typeSel.innerHTML = TAP_ACTIONS.map((v) =>
+        `<option value="${v}" ${v === type ? 'selected' : ''}>${this._actionLabel(v)}</option>`).join('');
       typeSel.dataset.filled = '1';
     } else if (typeSel) {
       typeSel.value = type;
@@ -1891,11 +2146,11 @@ class SunWeatherCardEditor extends HTMLElement {
     if (!extra) return;
     let html = '';
     if (type === 'navigate') {
-      html = `<label>Navigation path</label><input type="text" id="${key}_nav" value="${act.navigation_path || ''}" placeholder="/lovelace/0">`;
+      html = `<label>${this.t('nav_path')}</label><input type="text" id="${key}_nav" value="${act.navigation_path || ''}" placeholder="/lovelace/0">`;
     } else if (type === 'url') {
-      html = `<label>URL</label><input type="text" id="${key}_url" value="${act.url_path || ''}" placeholder="https://...">`;
+      html = `<label>${this.t('url_label')}</label><input type="text" id="${key}_url" value="${act.url_path || ''}" placeholder="https://...">`;
     } else if (type === 'perform-action') {
-      html = `<label>Action (domain.service)</label><input type="text" id="${key}_srv" value="${act.perform_action || act.service || ''}" placeholder="script.my_script">`;
+      html = `<label>${this.t('action_srv')}</label><input type="text" id="${key}_srv" value="${act.perform_action || act.service || ''}" placeholder="script.my_script">`;
     }
     // more-info e toggle usano automaticamente l'entità meteo scelta sopra
     extra.innerHTML = html;
@@ -1920,7 +2175,7 @@ window.customCards.push({
 });
 
 console.info(
-  '%c SUN-WEATHER-CARD %c 1.0.0 ',
+  '%c SUN-WEATHER-CARD %c 1.1.0 ',
   'color: white; background: #ff7a59; font-weight: 700;',
   'color: #ff7a59; background: #1c1c1c; font-weight: 700;'
 );
