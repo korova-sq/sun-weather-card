@@ -27,7 +27,8 @@ A weather card for [Home Assistant](https://www.home-assistant.io/) with an anim
 - **Daily & hourly forecast** – choose `daily` or `hourly`.
 - **Two layouts** – classic **bars** (iOS‑style temperature range bars) or a **graph** (smooth temperature line, with max/min lines for daily).
 - **Original animated SVG icons** for sun, moon, clouds, rain, snow, fog, wind and lightning. No external assets.
-- **Multi‑language** – card content follows Italian, English, or your Home Assistant system language.
+- **Transparent or image background** – make the card blend into your dashboard, or set a background image with an adjustable light/dark overlay for readability.
+- **Multi‑language** – card content follows Italian, English, or your Home Assistant system language. The UI editor also follows your Home Assistant language.
 - **Tap / hold / double‑tap actions** – standard Home Assistant actions (more‑info, navigate, url, perform‑action, toggle).
 - **Show only what you need** – time, date and the sun arc can each be turned on or off, and you choose exactly which detail attributes to display.
 - **UI editor** – configure everything without touching YAML.
@@ -94,6 +95,9 @@ All options can be set from the visual editor or in YAML.
 | `show_time` | boolean | `true` | Show the clock. |
 | `show_date` | boolean | `true` | Show the date. |
 | `show_arc` | boolean | `true` | Show the sunrise/sunset arc. |
+| `transparent` | boolean | `false` | Transparent background — the card blends into the dashboard (no background, border or shadow). |
+| `background_image` | string | *none* | Background image URL or `/local/…` path. |
+| `background_overlay` | number | `0` | Overlay over the background image, from `-1` (light) through `0` (none) to `1` (dark), for text readability. |
 | `forecast_type` | string | `daily` | `daily` or `hourly`. |
 | `forecast_layout` | string | `bars` | `bars` or `graph`. |
 | `forecast_days` | number | `7` | Number of days to load (daily). |
