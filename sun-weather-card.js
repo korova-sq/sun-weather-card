@@ -1,7 +1,7 @@
 /**
  * Sun Weather Card
  * https://github.com/korova-sq/sun-weather-card
- * Version: 1.1.0
+ * Version: 1.1.1
  *
  * A weather card with an animated current-conditions header, a sunrise/sunset
  * arc, and daily/hourly forecasts shown as iOS-style bars or a line graph.
@@ -135,11 +135,18 @@ class SunWeatherCard extends HTMLElement {
         /* sfondo trasparente totale: via sfondo, ombra e bordo */
         ha-card.transparent {
           background: transparent !important;
+          background-color: transparent !important;
+          background-image: none !important;
           box-shadow: none !important;
           border: none !important;
+          /* temi "glass" (es. Frosted Glass) usano backdrop-filter e variabili proprie */
+          -webkit-backdrop-filter: none !important;
+          backdrop-filter: none !important;
           --ha-card-background: transparent;
           --ha-card-box-shadow: none;
           --ha-card-border-width: 0;
+          --ha-card-backdrop-filter: none;
+          --card-background-color: transparent;
         }
         /* immagine di sfondo: dipinta sulla card stessa (card normale, nessun
            wrapper che spunta agli angoli). Il velo e' incorporato nel background. */
@@ -646,12 +653,16 @@ class SunWeatherCard extends HTMLElement {
       const act = (this._config.tap_action && this._config.tap_action.action) || 'more-info';
       cardEl.classList.toggle('clickable', act !== 'none');
 
-      // sfondo trasparente
-      cardEl.classList.toggle('transparent', this._config.transparent === true);
+      // immagine di sfondo e trasparenza sono mutuamente esclusive:
+      // se c'e' un'immagine, ha la precedenza e la trasparenza viene ignorata.
+      const bg = this._config.background_image;
+      const hasBg = !!bg;
+
+      // sfondo trasparente (solo se non c'e' un'immagine)
+      cardEl.classList.toggle('transparent', this._config.transparent === true && !hasBg);
 
       // immagine di sfondo con velo incorporato, dipinta sulla card stessa
-      const bg = this._config.background_image;
-      if (bg) {
+      if (hasBg) {
         cardEl.classList.add('has-bg-image');
 
         // velo unico: valore da -1 (chiaro) a +1 (scuro), 0 = nessun velo
@@ -2175,7 +2186,7 @@ window.customCards.push({
 });
 
 console.info(
-  '%c SUN-WEATHER-CARD %c 1.1.0 ',
+  '%c SUN-WEATHER-CARD %c 1.1.1 ',
   'color: white; background: #ff7a59; font-weight: 700;',
   'color: #ff7a59; background: #1c1c1c; font-weight: 700;'
 );
