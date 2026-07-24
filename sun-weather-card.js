@@ -54,11 +54,29 @@ const CONDITION_LABELS = {
     'windy-variant': 'Windy',
     exceptional: 'Exceptional',
   },
+  de: {
+    'clear-night': 'Klar',
+    cloudy: 'Bewölkt',
+    fog: 'Nebel',
+    hail: 'Hagel',
+    lightning: 'Gewitter',
+    'lightning-rainy': 'Gewitter mit Regen',
+    partlycloudy: 'Teilweise bewölkt',
+    pouring: 'Starkregen',
+    rainy: 'Regnerisch',
+    snowy: 'Schnee',
+    'snowy-rainy': 'Schneeregen',
+    sunny: 'Sonnig',
+    windy: 'Windig',
+    'windy-variant': 'Windig',
+    exceptional: 'Außergewöhnlich',
+  },
 };
 
 const UI_LABELS = {
   it: { sunrise: 'alba', sunset: 'tramonto', daily: 'Giorni', hourly: 'Ore' },
   en: { sunrise: 'sunrise', sunset: 'sunset', daily: 'Daily', hourly: 'Hourly' },
+  de: { sunrise: 'Sonnenaufgang', sunset: 'Sonnenuntergang', daily: 'Tage', hourly: 'Stunden' },
 };
 
 class SunWeatherCard extends HTMLElement {
@@ -748,11 +766,12 @@ class SunWeatherCard extends HTMLElement {
   }
 
   // Risolve la lingua scelta in un locale effettivo.
-  // 'it' -> it-IT, 'en' -> en-GB, 'system' -> lingua di HA/browser.
+  // 'it' -> it-IT, 'en' -> en-GB, 'de' -> de-DE, 'system' -> lingua di HA/browser.
   _locale() {
     const lang = this._config.language || 'system';
     if (lang === 'it') return 'it-IT';
     if (lang === 'en') return 'en-GB';
+    if (lang === 'de') return 'de-DE';
     // system: usa la lingua dell'utente HA, poi il browser, poi it-IT
     return (this._hass && this._hass.locale && this._hass.locale.language)
       || (this._hass && this._hass.language)
@@ -760,17 +779,21 @@ class SunWeatherCard extends HTMLElement {
       || 'it-IT';
   }
 
-  // Etichetta condizione meteo tradotta secondo la lingua effettiva (it/en).
+  // Etichetta condizione meteo tradotta secondo la lingua effettiva (it/en/de).
   _conditionLabel(state) {
     const loc = (this._locale() || 'it').toLowerCase();
-    const table = loc.startsWith('it') ? CONDITION_LABELS.it : CONDITION_LABELS.en;
+    const table = loc.startsWith('it') ? CONDITION_LABELS.it
+      : loc.startsWith('de') ? CONDITION_LABELS.de
+      : CONDITION_LABELS.en;
     return table[state] || state;
   }
 
   // Etichette dell'interfaccia (alba/tramonto sotto l'arco) nella lingua attiva.
   _uiLabels() {
     const loc = (this._locale() || 'it').toLowerCase();
-    return loc.startsWith('it') ? UI_LABELS.it : UI_LABELS.en;
+    return loc.startsWith('it') ? UI_LABELS.it
+      : loc.startsWith('de') ? UI_LABELS.de
+      : UI_LABELS.en;
   }
 
   _renderCurrent(now) {
@@ -1629,7 +1652,7 @@ const EDITOR_I18N = {
     appearance: 'Appearance',
     location: 'Location name (empty = automatic)',
     language: 'Language',
-    lang_system: 'System', lang_it: 'Italiano', lang_en: 'English',
+    lang_system: 'System', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch',
     time_format: 'Time format',
     tf_24: '24 hours', tf_12: '12 hours',
     show_time: 'Show time',
@@ -1676,7 +1699,7 @@ const EDITOR_I18N = {
     appearance: 'Aspetto',
     location: 'Nome località (vuoto = automatico)',
     language: 'Lingua',
-    lang_system: 'Sistema', lang_it: 'Italiano', lang_en: 'English',
+    lang_system: 'Sistema', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch',
     time_format: 'Formato ora',
     tf_24: '24 ore', tf_12: '12 ore',
     show_time: 'Mostra orario',
@@ -1716,6 +1739,53 @@ const EDITOR_I18N = {
     det_apparent_temperature: 'Temp. percepita', det_cloud_coverage: 'Copertura nuvolosa',
     det_uv_index: 'Indice UV', det_dew_point: 'Punto di rugiada',
   },
+  de: {
+    entities: 'Entitäten',
+    weather_entity: 'Wetter-Entität',
+    sun_entity: 'Sonnen-Entität (Sonnenauf-/-untergangsbogen)',
+    appearance: 'Darstellung',
+    location: 'Ortsname (leer = automatisch)',
+    language: 'Sprache',
+    lang_system: 'System', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch',
+    time_format: 'Zeitformat',
+    tf_24: '24 Stunden', tf_12: '12 Stunden',
+    show_time: 'Uhrzeit anzeigen',
+    show_date: 'Datum anzeigen',
+    show_arc: 'Sonnenbogen anzeigen',
+    transparent: 'Transparenter Hintergrund',
+    background_image: 'Hintergrundbild (URL oder /local/…-Pfad)',
+    overlay: 'Überlagerung: heller ⟵ keine ⟶ dunkler',
+    ov_lighter: 'Heller', ov_zero: '0', ov_darker: 'Dunkler',
+    forecast: 'Vorhersage',
+    forecast_type: 'Vorhersagetyp',
+    ft_daily: 'Täglich', ft_hourly: 'Stündlich',
+    daily_layout: 'Tages-Layout',
+    dl_bars: 'Balken', dl_graph: 'Diagramm (Linien)',
+    days_to_load: 'Zu ladende Tage',
+    hours_to_load: 'Zu ladende Stunden',
+    visible_rows: 'Sichtbare Zeilen (leer = alle)',
+    show_rain: 'Tagesregen anzeigen (mm)',
+    show_toggle: 'Umschalter Tage/Stunden in der Karte',
+    details: 'Details',
+    details_hint: 'Attribute unten hinzufügen. Chips zum Umsortieren ziehen. Zum Entfernen ✕ tippen.',
+    details_empty: 'Noch keine Details. Unten hinzufügen.',
+    all_added: '— alle hinzugefügt —',
+    interaction: 'Interaktion',
+    tap_behavior: 'Bei Tippen',
+    hold_behavior: 'Bei langem Drücken',
+    double_tap_behavior: 'Bei Doppeltippen',
+    nav_path: 'Navigationspfad',
+    url_label: 'URL',
+    action_srv: 'Aktion (domain.service)',
+    act_more_info: 'Entitäts-Info', act_navigate: 'Navigieren', act_url: 'URL',
+    act_perform: 'Aktion ausführen', act_toggle: 'Umschalten', act_none: 'Nichts',
+    det_humidity: 'Luftfeuchtigkeit', det_pressure: 'Luftdruck', det_wind_speed: 'Windgeschwindigkeit',
+    det_wind_bearing: 'Windrichtung', det_precipitation: 'Niederschlag (mm)',
+    det_precipitation_probability: 'Niederschlagswahrsch.', det_sunrise: 'Sonnenaufgang',
+    det_sunset: 'Sonnenuntergang', det_visibility: 'Sichtweite',
+    det_apparent_temperature: 'Gefühlte Temp.', det_cloud_coverage: 'Bewölkung',
+    det_uv_index: 'UV-Index', det_dew_point: 'Taupunkt',
+  },
 };
 
 class SunWeatherCardEditor extends HTMLElement {
@@ -1739,12 +1809,13 @@ class SunWeatherCardEditor extends HTMLElement {
     }
   }
 
-  // lingua editor: segue HA/browser; 'it' -> italiano, altrimenti inglese
+  // lingua editor: segue HA/browser; 'it' -> italiano, 'de' -> tedesco, altrimenti inglese
   _lang() {
     const l = (this._hass && this._hass.locale && this._hass.locale.language)
       || (this._hass && this._hass.language)
       || navigator.language || 'en';
-    return String(l).toLowerCase().startsWith('it') ? 'it' : 'en';
+    const s = String(l).toLowerCase();
+    return s.startsWith('it') ? 'it' : s.startsWith('de') ? 'de' : 'en';
   }
 
   t(key) {
@@ -1937,6 +2008,7 @@ class SunWeatherCardEditor extends HTMLElement {
                 <option value="system" ${lang === 'system' ? 'selected' : ''}>${this.t('lang_system')}</option>
                 <option value="it" ${lang === 'it' ? 'selected' : ''}>${this.t('lang_it')}</option>
                 <option value="en" ${lang === 'en' ? 'selected' : ''}>${this.t('lang_en')}</option>
+                <option value="de" ${lang === 'de' ? 'selected' : ''}>${this.t('lang_de')}</option>
               </select>
             </div>
             <div class="row inline">
