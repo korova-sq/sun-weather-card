@@ -1,7 +1,7 @@
 /**
  * Sun Weather Card
  * https://github.com/korova-sq/sun-weather-card
- * Version: 1.1.1
+ * Version: 1.1.2
  *
  * A weather card with an animated current-conditions header, a sunrise/sunset
  * arc, and daily/hourly forecasts shown as iOS-style bars or a line graph.
@@ -659,7 +659,26 @@ class SunWeatherCard extends HTMLElement {
       const hasBg = !!bg;
 
       // sfondo trasparente (solo se non c'e' un'immagine)
-      cardEl.classList.toggle('transparent', this._config.transparent === true && !hasBg);
+      const wantTransparent = this._config.transparent === true && !hasBg;
+      cardEl.classList.toggle('transparent', wantTransparent);
+
+      // Applica la trasparenza anche come stile inline con !important:
+      // gli stili inline battono qualsiasi foglio di stile, compresi i temi
+      // "glass" che iniettano regole nella card (es. via card-mod).
+      const forced = [
+        ['background', 'transparent'],
+        ['background-color', 'transparent'],
+        ['background-image', 'none'],
+        ['box-shadow', 'none'],
+        ['border', 'none'],
+        ['backdrop-filter', 'none'],
+        ['-webkit-backdrop-filter', 'none'],
+      ];
+      if (wantTransparent) {
+        forced.forEach(([p, v]) => cardEl.style.setProperty(p, v, 'important'));
+      } else {
+        forced.forEach(([p]) => cardEl.style.removeProperty(p));
+      }
 
       // immagine di sfondo con velo incorporato, dipinta sulla card stessa
       if (hasBg) {
@@ -2186,7 +2205,7 @@ window.customCards.push({
 });
 
 console.info(
-  '%c SUN-WEATHER-CARD %c 1.1.1 ',
+  '%c SUN-WEATHER-CARD %c 1.1.2 ',
   'color: white; background: #ff7a59; font-weight: 700;',
   'color: #ff7a59; background: #1c1c1c; font-weight: 700;'
 );
