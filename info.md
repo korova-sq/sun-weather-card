@@ -8,7 +8,7 @@ forecasts as iOS‑style bars or a smooth line graph. Configurable from the UI.
 - Bars **or** graph layout, daily **or** hourly
 - Pick which detail attributes to show (they appear only if your integration
   provides them)
-- Italian / English / system language
+- Italian, English or German / system language
 - Tap, hold and double‑tap actions
 - Full visual editor
 
