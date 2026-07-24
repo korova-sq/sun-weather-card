@@ -28,7 +28,7 @@ A weather card for [Home Assistant](https://www.home-assistant.io/) with an anim
 - **Two layouts** – classic **bars** (iOS‑style temperature range bars) or a **graph** (smooth temperature line, with max/min lines for daily).
 - **Original animated SVG icons** for sun, moon, clouds, rain, snow, fog, wind and lightning. No external assets.
 - **Transparent or image background** – make the card blend into your dashboard, or set a background image with an adjustable light/dark overlay for readability.
-- **Multi‑language** – card content follows Italian, English, or your Home Assistant system language. The UI editor also follows your Home Assistant language.
+- **Multi‑language** – card content in Italian, English or German, or follow your Home Assistant system language. The UI editor follows your Home Assistant language too.
 - **Tap / hold / double‑tap actions** – standard Home Assistant actions (more‑info, navigate, url, perform‑action, toggle).
 - **Show only what you need** – time, date and the sun arc can each be turned on or off, and you choose exactly which detail attributes to display.
 - **UI editor** – configure everything without touching YAML.
@@ -90,7 +90,7 @@ All options can be set from the visual editor or in YAML.
 | `entity` | string | **required** | Your `weather.*` entity. |
 | `sun_entity` | string | `sun.sun` | Sun entity used for the sunrise/sunset arc. |
 | `location` | string | *auto* | Location name shown under the condition. Empty = taken automatically. |
-| `language` | string | `system` | Card language: `system`, `it` or `en`. |
+| `language` | string | `system` | Card language: `system`, `it`, `en` or `de`. |
 | `time_format` | string | `24` | `24` or `12` hour clock. |
 | `show_time` | boolean | `true` | Show the clock. |
 | `show_date` | boolean | `true` | Show the date. |
