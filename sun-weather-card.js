@@ -1,7 +1,7 @@
 /**
  * Sun Weather Card
  * https://github.com/korova-sq/sun-weather-card
- * Version: 1.1.2
+ * Version: 1.1.3
  *
  * A weather card with an animated current-conditions header, a sunrise/sunset
  * arc, and daily/hourly forecasts shown as iOS-style bars or a line graph.
@@ -147,6 +147,17 @@ class SunWeatherCard extends HTMLElement {
           --ha-card-border-width: 0;
           --ha-card-backdrop-filter: none;
           --card-background-color: transparent;
+        }
+        /* i temi "glass" disegnano spesso il vetro con uno pseudo-elemento
+           sopra la card: va neutralizzato anche quello */
+        ha-card.transparent::before,
+        ha-card.transparent::after {
+          content: none !important;
+          display: none !important;
+          background: none !important;
+          -webkit-backdrop-filter: none !important;
+          backdrop-filter: none !important;
+          box-shadow: none !important;
         }
         /* immagine di sfondo: dipinta sulla card stessa (card normale, nessun
            wrapper che spunta agli angoli). Il velo e' incorporato nel background. */
@@ -673,6 +684,13 @@ class SunWeatherCard extends HTMLElement {
         ['border', 'none'],
         ['backdrop-filter', 'none'],
         ['-webkit-backdrop-filter', 'none'],
+        // variabili dei temi: ereditano anche dentro la shadow DOM di ha-card
+        ['--ha-card-background', 'transparent'],
+        ['--card-background-color', 'transparent'],
+        ['--ha-card-box-shadow', 'none'],
+        ['--ha-card-border-width', '0'],
+        ['--ha-card-border-color', 'transparent'],
+        ['--ha-card-backdrop-filter', 'none'],
       ];
       if (wantTransparent) {
         forced.forEach(([p, v]) => cardEl.style.setProperty(p, v, 'important'));
@@ -2205,7 +2223,7 @@ window.customCards.push({
 });
 
 console.info(
-  '%c SUN-WEATHER-CARD %c 1.1.2 ',
+  '%c SUN-WEATHER-CARD %c 1.1.3 ',
   'color: white; background: #ff7a59; font-weight: 700;',
   'color: #ff7a59; background: #1c1c1c; font-weight: 700;'
 );
