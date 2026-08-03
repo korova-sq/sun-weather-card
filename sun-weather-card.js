@@ -1,7 +1,7 @@
 /**
  * Sun Weather Card
  * https://github.com/korova-sq/sun-weather-card
- * Version: 1.2.0
+ * Version: 1.3.0
  *
  * A weather card with an animated current-conditions header, a sunrise/sunset
  * arc, and daily/hourly forecasts shown as iOS-style bars or a line graph.
@@ -120,6 +120,9 @@ class SunWeatherCard extends HTMLElement {
       // velo sopra l'immagine di sfondo, valore unico da -1 a +1:
       //  -1 = chiaro pieno, 0 = nessun velo, +1 = scuro pieno.
       background_overlay: 0,
+      // icone meteo animate: false = icone statiche (piu' leggere su
+      // dispositivi lenti)
+      animated_icons: true,
       ...config,
     };
     // dettagli: se la chiave e' omessa NON mostrare nulla di default
@@ -244,7 +247,7 @@ class SunWeatherCard extends HTMLElement {
           flex: 1 1 auto;
         }
         .current .cur-desc {
-          font-size: 1.7em;
+          font-size: var(--swc-desc-size, 1.7em);
           font-weight: 600;
           color: var(--primary-text-color);
           line-height: 1.25;
@@ -796,6 +799,36 @@ class SunWeatherCard extends HTMLElement {
       : UI_LABELS.en;
   }
 
+  // Riduce la dimensione del testo condizione se non entra su una riga,
+  // cosi' le condizioni lunghe (es. "Parzialmente nuvoloso") restano leggibili
+  // senza puntini di sospensione. Le condizioni corte restano grandi.
+  _fitConditionText(el) {
+    if (!el) return;
+    const measure = () => {
+      if (!el.clientWidth) return; // non ancora nel layout
+      el.style.setProperty('--swc-desc-size', '1.7em');
+      let size = 1.7;
+      let guard = 0;
+      while (el.scrollWidth > el.clientWidth && size > 1.0 && guard < 20) {
+        size -= 0.05;
+        el.style.setProperty('--swc-desc-size', size.toFixed(2) + 'em');
+        guard += 1;
+      }
+    };
+    // doppio rAF: la prima volta il layout puo' non essere ancora stabile
+    requestAnimationFrame(() => { measure(); requestAnimationFrame(measure); });
+
+    // ri-misura se la card cambia larghezza (una sola volta l'osservatore)
+    if (!this._descResizeObs && typeof ResizeObserver !== 'undefined') {
+      this._descResizeObs = new ResizeObserver(() => {
+        const e = this.shadowRoot && this.shadowRoot.getElementById('cur-desc');
+        if (e) this._fitConditionText(e);
+      });
+      const card = this.shadowRoot.querySelector('ha-card');
+      if (card) this._descResizeObs.observe(card);
+    }
+  }
+
   _renderCurrent(now) {
     const wState = this._hass.states[this._config.entity];
     if (!wState) return;
@@ -838,8 +871,9 @@ class SunWeatherCard extends HTMLElement {
     this._iconUid += 1;
     this.shadowRoot.getElementById('cur-icon').innerHTML =
       this._icon(condition, this._iconUid, 68);
-    this.shadowRoot.getElementById('cur-desc').textContent =
-      this._conditionLabel(wState.state);
+    const descEl = this.shadowRoot.getElementById('cur-desc');
+    descEl.textContent = this._conditionLabel(wState.state);
+    this._fitConditionText(descEl);
     this.shadowRoot.getElementById('cur-location').textContent = location;
     this.shadowRoot.getElementById('cur-temp').textContent =
       temp != null ? `${numFmt.format(temp)}${unit}` : '--';
@@ -1422,7 +1456,17 @@ class SunWeatherCard extends HTMLElement {
       exceptional: () => this._iconExceptional(uid, size),
     };
     const fn = map[condition] || map.cloudy;
-    return fn();
+    let svg = fn();
+    // se le animazioni sono disattivate, rimuovi i tag SMIL (icone statiche)
+    if (this._config && this._config.animated_icons === false) {
+      svg = svg.replace(/<animateTransform\b[^>]*\/>/g, '')
+               .replace(/<animate\b[^>]*\/>/g, '');
+      // gli elementi animati in opacita' partono invisibili (opacity="0"):
+      // senza animazione resterebbero nascosti, quindi li rendo visibili.
+      // Le opacita' parziali (0.3, 0.7...) sono scelte estetiche: non si toccano.
+      svg = svg.replace(/opacity="0"/g, 'opacity="1"');
+    }
+    return svg;
   }
 
   _iconSunny(uid, size) {
@@ -1658,6 +1702,7 @@ const EDITOR_I18N = {
     show_time: 'Show time',
     show_date: 'Show date',
     show_arc: 'Show sun arc',
+    animated_icons: 'Animated icons',
     transparent: 'Transparent background',
     background_image: 'Background image (URL or /local/… path)',
     overlay: 'Overlay: lighter ⟵ none ⟶ darker',
@@ -1705,6 +1750,7 @@ const EDITOR_I18N = {
     show_time: 'Mostra orario',
     show_date: 'Mostra data',
     show_arc: 'Mostra arco del sole',
+    animated_icons: 'Icone animate',
     transparent: 'Sfondo trasparente',
     background_image: 'Immagine di sfondo (URL o percorso /local/…)',
     overlay: 'Velo: più chiaro ⟵ niente ⟶ più scuro',
@@ -1752,6 +1798,7 @@ const EDITOR_I18N = {
     show_time: 'Uhrzeit anzeigen',
     show_date: 'Datum anzeigen',
     show_arc: 'Sonnenbogen anzeigen',
+    animated_icons: 'Animierte Symbole',
     transparent: 'Transparenter Hintergrund',
     background_image: 'Hintergrundbild (URL oder /local/…-Pfad)',
     overlay: 'Überlagerung: heller ⟵ keine ⟶ dunkler',
@@ -2028,6 +2075,9 @@ class SunWeatherCardEditor extends HTMLElement {
               <label class="switch"><input type="checkbox" id="show_arc" ${c.show_arc !== false ? 'checked' : ''}> ${this.t('show_arc')}</label>
             </div>
             <div class="row inline">
+              <label class="switch"><input type="checkbox" id="animated_icons" ${c.animated_icons !== false ? 'checked' : ''}> ${this.t('animated_icons')}</label>
+            </div>
+            <div class="row inline">
               <label class="switch"><input type="checkbox" id="transparent" ${c.transparent === true ? 'checked' : ''}> ${this.t('transparent')}</label>
             </div>
             <div class="row">
@@ -2140,6 +2190,7 @@ class SunWeatherCardEditor extends HTMLElement {
     bind('show_time', 'change', (e) => this._set('show_time', e.target.checked));
     bind('show_date', 'change', (e) => this._set('show_date', e.target.checked));
     bind('show_arc', 'change', (e) => this._set('show_arc', e.target.checked));
+    bind('animated_icons', 'change', (e) => this._set('animated_icons', e.target.checked));
     bind('transparent', 'change', (e) => this._set('transparent', e.target.checked));
     bind('background_image', 'input', (e) => this._set('background_image', e.target.value));
     bind('background_overlay', 'input', (e) => this._set('background_overlay', Number(e.target.value)));
@@ -2295,7 +2346,7 @@ window.customCards.push({
 });
 
 console.info(
-  '%c SUN-WEATHER-CARD %c 1.2.0 ',
+  '%c SUN-WEATHER-CARD %c 1.3.0 ',
   'color: white; background: #ff7a59; font-weight: 700;',
   'color: #ff7a59; background: #1c1c1c; font-weight: 700;'
 );

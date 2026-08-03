@@ -26,7 +26,7 @@ A weather card for [Home Assistant](https://www.home-assistant.io/) with an anim
 - **Configurable details** – pick which attributes to show below the arc (humidity, pressure, wind, precipitation, UV, sunrise/sunset and more), shown as a tidy grid. Each attribute (humidity, pressure, wind, precipitation, UV index, etc.) is shown only if your weather integration provides it.
 - **Daily & hourly forecast** – choose `daily` or `hourly`.
 - **Two layouts** – classic **bars** (iOS‑style temperature range bars) or a **graph** (smooth temperature line, with max/min lines for daily).
-- **Original animated SVG icons** for sun, moon, clouds, rain, snow, fog, wind and lightning. No external assets.
+- **Original animated SVG icons** for sun, moon, clouds, rain, snow, fog, wind and lightning. No external assets — animations can be turned off for lower-end devices.
 - **Transparent or image background** – make the card blend into your dashboard, or set a background image with an adjustable light/dark overlay for readability.
 - **Multi‑language** – card content in Italian, English or German, or follow your Home Assistant system language. The UI editor follows your Home Assistant language too.
 - **Tap / hold / double‑tap actions** – standard Home Assistant actions (more‑info, navigate, url, perform‑action, toggle).
@@ -95,6 +95,7 @@ All options can be set from the visual editor or in YAML.
 | `show_time` | boolean | `true` | Show the clock. |
 | `show_date` | boolean | `true` | Show the date. |
 | `show_arc` | boolean | `true` | Show the sunrise/sunset arc. |
+| `animated_icons` | boolean | `true` | Animate the weather icons. Set to `false` for static icons (lighter on slow devices). |
 | `transparent` | boolean | `false` | Transparent background — the card blends into the dashboard (no background, border or shadow). |
 | `background_image` | string | *none* | Background image URL or `/local/…` path. |
 | `background_overlay` | number | `0` | Overlay over the background image, from `-1` (light) through `0` (none) to `1` (dark), for text readability. |
