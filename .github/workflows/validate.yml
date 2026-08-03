@@ -1,3 +1,4 @@
+# HACS validation workflow for sun-weather-card
 name: Validate
 
 on:
