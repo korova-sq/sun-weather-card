@@ -901,10 +901,20 @@ class SunWeatherCard extends HTMLElement {
     this.shadowRoot.getElementById('cur-hilo').textContent = hilo;
   }
 
-  // Converte i gradi bussola in sigla italiana a 16 punti
+  // Converte i gradi bussola in sigla a 16 punti nella lingua attiva
   _bearingToText(deg) {
-    const dirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
-                  'S', 'SSO', 'SO', 'OSO', 'O', 'ONO', 'NO', 'NNO'];
+    const loc = (this._locale() || 'it').toLowerCase();
+    const dirs = loc.startsWith('it')
+      ? ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+         'S', 'SSO', 'SO', 'OSO', 'O', 'ONO', 'NO', 'NNO']
+      : loc.startsWith('de')
+      ? ['N', 'NNO', 'NO', 'ONO', 'O', 'OSO', 'SO', 'SSO',
+         'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW']
+      : loc.startsWith('nl')
+      ? ['N', 'NNO', 'NO', 'ONO', 'O', 'OZO', 'ZO', 'ZZO',
+         'Z', 'ZZW', 'ZW', 'WZW', 'W', 'WNW', 'NW', 'NNW']
+      : ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+         'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
     return dirs[Math.round(deg / 22.5) % 16];
   }
 
