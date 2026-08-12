@@ -71,12 +71,30 @@ const CONDITION_LABELS = {
     'windy-variant': 'Windig',
     exceptional: 'Außergewöhnlich',
   },
+  nl: {
+    'clear-night': 'Helder',
+    cloudy: 'Bewolkt',
+    fog: 'Mist',
+    hail: 'Hagel',
+    lightning: 'Onweer',
+    'lightning-rainy': 'Onweer met regen',
+    partlycloudy: 'Gedeeltelijk bewolkt',
+    pouring: 'Zware regen',
+    rainy: 'Regenachtig',
+    snowy: 'Sneeuw',
+    'snowy-rainy': 'Natte sneeuw',
+    sunny: 'Zonnig',
+    windy: 'Winderig',
+    'windy-variant': 'Winderig',
+    exceptional: 'Uitzonderlijk',
+  },
 };
 
 const UI_LABELS = {
   it: { sunrise: 'alba', sunset: 'tramonto', daily: 'Giorni', hourly: 'Ore' },
   en: { sunrise: 'sunrise', sunset: 'sunset', daily: 'Daily', hourly: 'Hourly' },
   de: { sunrise: 'Sonnenaufgang', sunset: 'Sonnenuntergang', daily: 'Tage', hourly: 'Stunden' },
+  nl: { sunrise: 'zonsopgang', sunset: 'zonsondergang', daily: 'Dagen', hourly: 'Uren' },
 };
 
 class SunWeatherCard extends HTMLElement {
@@ -769,12 +787,13 @@ class SunWeatherCard extends HTMLElement {
   }
 
   // Risolve la lingua scelta in un locale effettivo.
-  // 'it' -> it-IT, 'en' -> en-GB, 'de' -> de-DE, 'system' -> lingua di HA/browser.
+  // 'it' -> it-IT, 'en' -> en-GB, 'de' -> de-DE, 'nl' -> nl-NL, 'system' -> lingua di HA/browser.
   _locale() {
     const lang = this._config.language || 'system';
     if (lang === 'it') return 'it-IT';
     if (lang === 'en') return 'en-GB';
     if (lang === 'de') return 'de-DE';
+    if (lang === 'nl') return 'nl-NL';
     // system: usa la lingua dell'utente HA, poi il browser, poi it-IT
     return (this._hass && this._hass.locale && this._hass.locale.language)
       || (this._hass && this._hass.language)
@@ -782,11 +801,12 @@ class SunWeatherCard extends HTMLElement {
       || 'it-IT';
   }
 
-  // Etichetta condizione meteo tradotta secondo la lingua effettiva (it/en/de).
+  // Etichetta condizione meteo tradotta secondo la lingua effettiva (it/en/de/nl).
   _conditionLabel(state) {
     const loc = (this._locale() || 'it').toLowerCase();
     const table = loc.startsWith('it') ? CONDITION_LABELS.it
       : loc.startsWith('de') ? CONDITION_LABELS.de
+      : loc.startsWith('nl') ? CONDITION_LABELS.nl
       : CONDITION_LABELS.en;
     return table[state] || state;
   }
@@ -796,6 +816,7 @@ class SunWeatherCard extends HTMLElement {
     const loc = (this._locale() || 'it').toLowerCase();
     return loc.startsWith('it') ? UI_LABELS.it
       : loc.startsWith('de') ? UI_LABELS.de
+      : loc.startsWith('nl') ? UI_LABELS.nl
       : UI_LABELS.en;
   }
 
@@ -880,10 +901,20 @@ class SunWeatherCard extends HTMLElement {
     this.shadowRoot.getElementById('cur-hilo').textContent = hilo;
   }
 
-  // Converte i gradi bussola in sigla italiana a 16 punti
+  // Converte i gradi bussola in sigla a 16 punti nella lingua attiva
   _bearingToText(deg) {
-    const dirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
-                  'S', 'SSO', 'SO', 'OSO', 'O', 'ONO', 'NO', 'NNO'];
+    const loc = (this._locale() || 'it').toLowerCase();
+    const dirs = loc.startsWith('it')
+      ? ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+         'S', 'SSO', 'SO', 'OSO', 'O', 'ONO', 'NO', 'NNO']
+      : loc.startsWith('de')
+      ? ['N', 'NNO', 'NO', 'ONO', 'O', 'OSO', 'SO', 'SSO',
+         'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW']
+      : loc.startsWith('nl')
+      ? ['N', 'NNO', 'NO', 'ONO', 'O', 'OZO', 'ZO', 'ZZO',
+         'Z', 'ZZW', 'ZW', 'WZW', 'W', 'WNW', 'NW', 'NNW']
+      : ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+         'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
     return dirs[Math.round(deg / 22.5) % 16];
   }
 
@@ -1696,7 +1727,7 @@ const EDITOR_I18N = {
     appearance: 'Appearance',
     location: 'Location name (empty = automatic)',
     language: 'Language',
-    lang_system: 'System', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch',
+    lang_system: 'System', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands',
     time_format: 'Time format',
     tf_24: '24 hours', tf_12: '12 hours',
     show_time: 'Show time',
@@ -1792,7 +1823,7 @@ const EDITOR_I18N = {
     appearance: 'Darstellung',
     location: 'Ortsname (leer = automatisch)',
     language: 'Sprache',
-    lang_system: 'System', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch',
+    lang_system: 'System', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands',
     time_format: 'Zeitformat',
     tf_24: '24 Stunden', tf_12: '12 Stunden',
     show_time: 'Uhrzeit anzeigen',
@@ -1833,6 +1864,54 @@ const EDITOR_I18N = {
     det_apparent_temperature: 'Gefühlte Temp.', det_cloud_coverage: 'Bewölkung',
     det_uv_index: 'UV-Index', det_dew_point: 'Taupunkt',
   },
+  nl: {
+    entities: 'Entiteiten',
+    weather_entity: 'Weer-entiteit',
+    sun_entity: 'Zon-entiteit (zonsopgang/-ondergang boog)',
+    appearance: 'Weergave',
+    location: 'Locatienaam (leeg = automatisch)',
+    language: 'Taal',
+    lang_system: 'Systeem', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands',
+    time_format: 'Tijdnotatie',
+    tf_24: '24 uur', tf_12: '12 uur',
+    show_time: 'Tijd tonen',
+    show_date: 'Datum tonen',
+    show_arc: 'Zonneboog tonen',
+    animated_icons: 'Geanimeerde iconen',
+    transparent: 'Transparante achtergrond',
+    background_image: 'Achtergrondafbeelding (URL of /local/…-pad)',
+    overlay: 'Overlay: lichter ⟵ geen ⟶ donkerder',
+    ov_lighter: 'Lichter', ov_zero: '0', ov_darker: 'Donkerder',
+    forecast: 'Voorspelling',
+    forecast_type: 'Voorspellingstype',
+    ft_daily: 'Dagelijks', ft_hourly: 'Uurlijks',
+    daily_layout: 'Dagelijkse layout',
+    dl_bars: 'Balken', dl_graph: 'Grafiek (lijnen)',
+    days_to_load: 'Te laden dagen',
+    hours_to_load: 'Te laden uren',
+    visible_rows: 'Zichtbare rijen (leeg = alle)',
+    show_rain: 'Dagelijkse neerslag tonen (mm)',
+    show_toggle: 'Dagen/Uren-schakelaar in kaart',
+    details: 'Details',
+    details_hint: 'Voeg hieronder attributen toe. Sleep de chips om te herordenen. Tik op ✕ om te verwijderen.',
+    details_empty: 'Nog geen details. Voeg hieronder attributen toe.',
+    all_added: '— alle toegevoegd —',
+    interaction: 'Interactie',
+    tap_behavior: 'Bij tikken',
+    hold_behavior: 'Bij lang indrukken',
+    double_tap_behavior: 'Bij dubbeltikken',
+    nav_path: 'Navigatiepad',
+    url_label: 'URL',
+    action_srv: 'Actie (domein.service)',
+    act_more_info: 'Entiteit-info', act_navigate: 'Navigeren', act_url: 'URL',
+    act_perform: 'Actie uitvoeren', act_toggle: 'Omschakelen', act_none: 'Niets',
+    det_humidity: 'Luchtvochtigheid', det_pressure: 'Luchtdruk', det_wind_speed: 'Windsnelheid',
+    det_wind_bearing: 'Windrichting', det_precipitation: 'Neerslag (mm)',
+    det_precipitation_probability: 'Kans op neerslag', det_sunrise: 'Zonsopgang',
+    det_sunset: 'Zonsondergang', det_visibility: 'Zicht',
+    det_apparent_temperature: 'Gevoelstemperatuur', det_cloud_coverage: 'Bewolking',
+    det_uv_index: 'UV-index', det_dew_point: 'Dauwpunt',
+  },
 };
 
 class SunWeatherCardEditor extends HTMLElement {
@@ -1856,13 +1935,13 @@ class SunWeatherCardEditor extends HTMLElement {
     }
   }
 
-  // lingua editor: segue HA/browser; 'it' -> italiano, 'de' -> tedesco, altrimenti inglese
+  // lingua editor: segue HA/browser; 'it' -> italiano, 'de' -> tedesco, 'nl' -> olandese, altrimenti inglese
   _lang() {
     const l = (this._hass && this._hass.locale && this._hass.locale.language)
       || (this._hass && this._hass.language)
       || navigator.language || 'en';
     const s = String(l).toLowerCase();
-    return s.startsWith('it') ? 'it' : s.startsWith('de') ? 'de' : 'en';
+    return s.startsWith('it') ? 'it' : s.startsWith('de') ? 'de' : s.startsWith('nl') ? 'nl' : 'en';
   }
 
   t(key) {
@@ -2056,6 +2135,7 @@ class SunWeatherCardEditor extends HTMLElement {
                 <option value="it" ${lang === 'it' ? 'selected' : ''}>${this.t('lang_it')}</option>
                 <option value="en" ${lang === 'en' ? 'selected' : ''}>${this.t('lang_en')}</option>
                 <option value="de" ${lang === 'de' ? 'selected' : ''}>${this.t('lang_de')}</option>
+                <option value="nl" ${lang === 'nl' ? 'selected' : ''}>${this.t('lang_nl')}</option>
               </select>
             </div>
             <div class="row inline">
