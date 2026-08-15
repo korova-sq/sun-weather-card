@@ -28,7 +28,8 @@ A weather card for [Home Assistant](https://www.home-assistant.io/) with an anim
 - **Two layouts** – classic **bars** (iOS‑style temperature range bars) or a **graph** (smooth temperature line, with max/min lines for daily).
 - **Original animated SVG icons** for sun, moon, clouds, rain, snow, fog, wind and lightning. No external assets — animations can be turned off for lower-end devices.
 - **Transparent or image background** – make the card blend into your dashboard, or set a background image with an adjustable light/dark overlay for readability.
-- **Multi‑language** – card content in Italian, English, German or Dutch, or follow your Home Assistant system language. The UI editor follows your Home Assistant language too.
+- **Custom sensors** – add any entity (or a specific attribute of it, e.g. the sun's elevation or next dawn) to the details, with an optional name and icon. Shown in their own row; names can be displayed under each value or on tap.
+- **Multi‑language** – card content in Italian, English, German, Dutch or French, or follow your Home Assistant system language. The UI editor follows the card language.
 - **Tap / hold / double‑tap actions** – standard Home Assistant actions (more‑info, navigate, url, perform‑action, toggle).
 - **Show only what you need** – time, date and the sun arc can each be turned on or off, and you choose exactly which detail attributes to display.
 - **UI editor** – configure everything without touching YAML.
@@ -90,7 +91,7 @@ All options can be set from the visual editor or in YAML.
 | `entity` | string | **required** | Your `weather.*` entity. |
 | `sun_entity` | string | `sun.sun` | Sun entity used for the sunrise/sunset arc. |
 | `location` | string | *auto* | Location name shown under the condition. Empty = taken automatically. |
-| `language` | string | `system` | Card language: `system`, `it`, `en`, `de` or `nl`. |
+| `language` | string | `system` | Card language: `system`, `it`, `en`, `de`, `nl` or `fr`. |
 | `time_format` | string | `24` | `24` or `12` hour clock. |
 | `show_time` | boolean | `true` | Show the clock. |
 | `show_date` | boolean | `true` | Show the date. |
@@ -107,6 +108,8 @@ All options can be set from the visual editor or in YAML.
 | `show_forecast_precipitation` | boolean | `true` | Show rain (mm) per day when provided. |
 | `show_forecast_toggle` | boolean | `false` | Show an in‑card Daily/Hourly toggle. |
 | `details` | list | *(none)* | Attributes to show below the arc (see below). |
+| `custom_details` | list | *(none)* | Extra entities to show in the details (see below). |
+| `show_sensor_names` | boolean | `true` | Show the custom sensor name under each value. When off, the name appears on tap. |
 | `tap_action` | action | `more-info` | Standard HA action. |
 | `hold_action` | action | – | Standard HA action. |
 | `double_tap_action` | action | – | Standard HA action. |
@@ -116,6 +119,21 @@ All options can be set from the visual editor or in YAML.
 Add any of these to the `details` list, in the order you want them shown. An item appears only if your integration provides that value.
 
 `humidity`, `pressure`, `wind_speed`, `wind_bearing`, `precipitation`, `precipitation_probability`, `sunrise`, `sunset`, `visibility`, `apparent_temperature`, `cloud_coverage`, `uv_index`, `dew_point`
+
+### Custom sensors
+
+Use `custom_details` to show any entity in the details grid — not just the weather entity's attributes. You can show the entity's state, or a specific attribute of it (for example the sun's `elevation` or `next_dawn`). Each item takes an `entity` and, optionally, an `attribute`, a `name` and an `icon`:
+
+```yaml
+custom_details:
+  - entity: sensor.outdoor_temperature
+  - entity: sun.sun
+    attribute: elevation
+    name: Sun elevation
+    icon: mdi:weather-sunny
+```
+
+Date/time attributes (like `next_dawn`) are formatted automatically. Names are shown under each value by default; set `show_sensor_names: false` to show them on tap instead.
 
 ---
 

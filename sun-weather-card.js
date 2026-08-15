@@ -1,7 +1,7 @@
 /**
  * Sun Weather Card
  * https://github.com/korova-sq/sun-weather-card
- * Version: 1.3.0
+ * Version: 1.5.0
  *
  * A weather card with an animated current-conditions header, a sunrise/sunset
  * arc, and daily/hourly forecasts shown as iOS-style bars or a line graph.
@@ -88,6 +88,23 @@ const CONDITION_LABELS = {
     'windy-variant': 'Winderig',
     exceptional: 'Uitzonderlijk',
   },
+  fr: {
+    'clear-night': 'Dégagé',
+    cloudy: 'Nuageux',
+    fog: 'Brouillard',
+    hail: 'Grêle',
+    lightning: 'Orage',
+    'lightning-rainy': 'Orage avec pluie',
+    partlycloudy: 'Partiellement nuageux',
+    pouring: 'Pluies fortes',
+    rainy: 'Pluvieux',
+    snowy: 'Neige',
+    'snowy-rainy': 'Neige fondante',
+    sunny: 'Ensoleillé',
+    windy: 'Venteux',
+    'windy-variant': 'Venteux',
+    exceptional: 'Exceptionnel',
+  },
 };
 
 const UI_LABELS = {
@@ -95,6 +112,7 @@ const UI_LABELS = {
   en: { sunrise: 'sunrise', sunset: 'sunset', daily: 'Daily', hourly: 'Hourly' },
   de: { sunrise: 'Sonnenaufgang', sunset: 'Sonnenuntergang', daily: 'Tage', hourly: 'Stunden' },
   nl: { sunrise: 'zonsopgang', sunset: 'zonsondergang', daily: 'Dagen', hourly: 'Uren' },
+  fr: { sunrise: 'lever du soleil', sunset: 'coucher du soleil', daily: 'Quotidien', hourly: 'Horaire' },
 };
 
 class SunWeatherCard extends HTMLElement {
@@ -349,6 +367,33 @@ class SunWeatherCard extends HTMLElement {
           padding: 7px 0;
           border-top: 1px solid var(--divider-color, #e0e0e0);
         }
+        .custom-details {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px 18px;
+          padding: 0 0 7px 0;
+        }
+        .custom-item {
+          min-width: 0; position: relative; text-align: left;
+          display: flex; flex-direction: column; align-items: flex-start;
+        }
+        .custom-item.has-tip { cursor: pointer; }
+        .custom-item .cd-row {
+          display: flex; align-items: center; justify-content: flex-start; gap: 4px;
+          font-size: 0.85em; color: var(--primary-text-color);
+        }
+        .custom-item .cd-row ha-icon {
+          --mdc-icon-size: 18px;
+          color: var(--paper-item-icon-color, #6b7a8d);
+          flex: 0 0 auto;
+        }
+        .custom-item .cd-row .d-val { white-space: nowrap; }
+        .custom-item .cd-name {
+          display: block;
+          font-size: 0.7em;
+          color: var(--secondary-text-color);
+          white-space: nowrap;
+        }
         .details:empty { display: none; padding: 0; border-top: none; }
         .detail-item {
           display: flex;
@@ -357,6 +402,29 @@ class SunWeatherCard extends HTMLElement {
           font-size: 0.85em;
           color: var(--primary-text-color);
           min-width: 0;
+          position: relative;
+        }
+        .detail-item.has-tip { cursor: pointer; }
+        .detail-tip {
+          position: absolute;
+          bottom: 100%;
+          left: 50%;
+          transform: translateX(-50%);
+          margin-bottom: 4px;
+          background: rgba(40, 44, 52, 0.97);
+          color: #fff;
+          padding: 4px 8px;
+          border-radius: 6px;
+          font-size: 0.8em;
+          white-space: nowrap;
+          z-index: 20;
+          box-shadow: 0 2px 10px rgba(0,0,0,0.4);
+          pointer-events: none;
+          animation: swc-tip-in 0.15s ease-out;
+        }
+        @keyframes swc-tip-in {
+          from { opacity: 0; transform: translateX(-50%) translateY(4px); }
+          to { opacity: 1; transform: translateX(-50%) translateY(0); }
         }
         .detail-item ha-icon {
           --mdc-icon-size: 18px;
@@ -530,6 +598,7 @@ class SunWeatherCard extends HTMLElement {
         </div>
 
         <div class="details" id="details"></div>
+        <div class="custom-details" id="custom-details"></div>
 
         <div class="forecast-list">
           <div class="forecast-toggle" id="forecast-toggle">
@@ -734,12 +803,24 @@ class SunWeatherCard extends HTMLElement {
       if (wantTransparent) {
         forced.forEach(([p, v]) => cardEl.style.setProperty(p, v, 'important'));
       } else {
-        forced.forEach(([p]) => cardEl.style.removeProperty(p));
+        // se c'e' un'immagine di sfondo, non toccare background/background-image
+        // (li gestisce il blocco immagine sotto); altrimenti si cancellerebbe
+        // l'immagine appena impostata, causando il "lampeggio".
+        forced.forEach(([p]) => {
+          if (hasBg && (p === 'background' || p === 'background-image' || p === 'background-color')) return;
+          cardEl.style.removeProperty(p);
+        });
       }
 
       // immagine di sfondo con velo incorporato, dipinta sulla card stessa
       if (hasBg) {
         cardEl.classList.add('has-bg-image');
+
+        // forza trasparenti gli sfondi-colore del tema (che coprirebbero
+        // l'immagine), ma NON background-image, che impostiamo qui sotto
+        cardEl.style.setProperty('background-color', 'transparent', 'important');
+        cardEl.style.setProperty('--ha-card-background', 'transparent', 'important');
+        cardEl.style.setProperty('--card-background-color', 'transparent', 'important');
 
         // velo unico: valore da -1 (chiaro) a +1 (scuro), 0 = nessun velo
         let ov = Number(this._config.background_overlay);
@@ -750,12 +831,17 @@ class SunWeatherCard extends HTMLElement {
         const veil = dark ? `rgba(0, 0, 0, ${op})` : `rgba(255, 255, 255, ${op})`;
         // velo come primo layer (gradiente pieno) sopra l'immagine
         const bgUrl = String(bg).trim();
-        cardEl.style.backgroundImage =
-          `linear-gradient(${veil}, ${veil}), url("${bgUrl}")`;
+        cardEl.style.setProperty('background-image',
+          `linear-gradient(${veil}, ${veil}), url("${bgUrl}")`, 'important');
         cardEl.classList.toggle('bg-dark', dark && op >= 0.4);
       } else {
         cardEl.classList.remove('has-bg-image', 'bg-dark');
-        cardEl.style.backgroundImage = '';
+        cardEl.style.removeProperty('background-image');
+        if (!wantTransparent) {
+          cardEl.style.removeProperty('background-color');
+          cardEl.style.removeProperty('--ha-card-background');
+          cardEl.style.removeProperty('--card-background-color');
+        }
       }
     }
 
@@ -787,13 +873,14 @@ class SunWeatherCard extends HTMLElement {
   }
 
   // Risolve la lingua scelta in un locale effettivo.
-  // 'it' -> it-IT, 'en' -> en-GB, 'de' -> de-DE, 'nl' -> nl-NL, 'system' -> lingua di HA/browser.
+  // 'it' -> it-IT, 'en' -> en-GB, 'de' -> de-DE, 'system' -> lingua di HA/browser.
   _locale() {
     const lang = this._config.language || 'system';
     if (lang === 'it') return 'it-IT';
     if (lang === 'en') return 'en-GB';
     if (lang === 'de') return 'de-DE';
     if (lang === 'nl') return 'nl-NL';
+    if (lang === 'fr') return 'fr-FR';
     // system: usa la lingua dell'utente HA, poi il browser, poi it-IT
     return (this._hass && this._hass.locale && this._hass.locale.language)
       || (this._hass && this._hass.language)
@@ -801,12 +888,13 @@ class SunWeatherCard extends HTMLElement {
       || 'it-IT';
   }
 
-  // Etichetta condizione meteo tradotta secondo la lingua effettiva (it/en/de/nl).
+  // Etichetta condizione meteo tradotta secondo la lingua effettiva (it/en/de).
   _conditionLabel(state) {
     const loc = (this._locale() || 'it').toLowerCase();
     const table = loc.startsWith('it') ? CONDITION_LABELS.it
       : loc.startsWith('de') ? CONDITION_LABELS.de
       : loc.startsWith('nl') ? CONDITION_LABELS.nl
+      : loc.startsWith('fr') ? CONDITION_LABELS.fr
       : CONDITION_LABELS.en;
     return table[state] || state;
   }
@@ -817,6 +905,7 @@ class SunWeatherCard extends HTMLElement {
     return loc.startsWith('it') ? UI_LABELS.it
       : loc.startsWith('de') ? UI_LABELS.de
       : loc.startsWith('nl') ? UI_LABELS.nl
+      : loc.startsWith('fr') ? UI_LABELS.fr
       : UI_LABELS.en;
   }
 
@@ -901,6 +990,28 @@ class SunWeatherCard extends HTMLElement {
     this.shadowRoot.getElementById('cur-hilo').textContent = hilo;
   }
 
+  // Formatta un valore per la griglia: le date/ore ISO diventano leggibili,
+  // il resto resta invariato.
+  _fmtValue(raw) {
+    if (typeof raw === 'string') {
+      // riconosce una data ISO tipo 2026-08-13T04:22:40+00:00
+      const isIso = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(raw);
+      if (isIso) {
+        const d = new Date(raw);
+        if (!isNaN(d)) {
+          const loc = this._locale() || undefined;
+          const now = new Date();
+          const sameDay = d.toDateString() === now.toDateString();
+          // stesso giorno -> solo ora (es. 04:22); altrimenti giorno+ora breve
+          return sameDay
+            ? d.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' })
+            : d.toLocaleString(loc, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+        }
+      }
+    }
+    return raw;
+  }
+
   // Converte i gradi bussola in sigla a 16 punti nella lingua attiva
   _bearingToText(deg) {
     const loc = (this._locale() || 'it').toLowerCase();
@@ -913,6 +1024,9 @@ class SunWeatherCard extends HTMLElement {
       : loc.startsWith('nl')
       ? ['N', 'NNO', 'NO', 'ONO', 'O', 'OZO', 'ZO', 'ZZO',
          'Z', 'ZZW', 'ZW', 'WZW', 'W', 'WNW', 'NW', 'NNW']
+      : loc.startsWith('fr')
+      ? ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+         'S', 'SSO', 'SO', 'OSO', 'O', 'ONO', 'NO', 'NNO']
       : ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
          'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
     return dirs[Math.round(deg / 22.5) % 16];
@@ -1018,7 +1132,7 @@ class SunWeatherCard extends HTMLElement {
       },
     };
 
-    const items = (this._config.details || [])
+    const stdItems = (this._config.details || [])
       .map((key) => {
         const def = defs[key];
         if (!def || def.val == null) return '';
@@ -1029,10 +1143,70 @@ class SunWeatherCard extends HTMLElement {
             <ha-icon icon="${def.icon}"${rot}></ha-icon>
             <span class="d-val">${def.val}</span>
           </div>`;
-      })
-      .join('');
+      });
 
-    box.innerHTML = items;
+    box.innerHTML = stdItems.join('');
+
+    // sensori personalizzati: griglia separata a 2 colonne sotto gli standard.
+    // Il nome puo' essere mostrato sotto il valore (show_sensor_names, default ON)
+    // oppure solo al tocco/hover (tooltip).
+    const cbox = this.shadowRoot.getElementById('custom-details');
+    if (cbox) {
+      const showNames = this._config.show_sensor_names !== false;
+      const customItems = (this._config.custom_details || [])
+        .map((c) => {
+          if (!c || !c.entity) return '';
+          const st = this._hass.states[c.entity];
+          if (!st) return '';
+          let raw, unit;
+          if (c.attribute) {
+            raw = st.attributes[c.attribute];
+            if (raw == null) return '';
+            unit = '';
+          } else {
+            raw = st.state;
+            unit = st.attributes.unit_of_measurement || '';
+          }
+          const val = `${this._fmtValue(raw)}${unit ? ' ' + unit : ''}`;
+          const icon = c.icon || st.attributes.icon || 'mdi:gauge';
+          const name = c.name || st.attributes.friendly_name || c.entity;
+          const nameHtml = showNames ? `<span class="cd-name">${name}</span>` : '';
+          // il tooltip al tocco serve solo quando i nomi NON sono mostrati sotto
+          const tipAttrs = showNames ? '' : ` title="${name}" data-name="${name}"`;
+          const tipClass = showNames ? '' : ' has-tip';
+          return `
+            <div class="custom-item${tipClass}"${tipAttrs}>
+              <div class="cd-row">
+                <ha-icon icon="${icon}"></ha-icon>
+                <span class="d-val">${val}</span>
+              </div>
+              ${nameHtml}
+            </div>`;
+        });
+      cbox.innerHTML = customItems.join('');
+      cbox.style.display = customItems.some((x) => x) ? '' : 'none';
+      this._wireDetailTips(cbox);
+    }
+  }
+
+  // mostra il nome al tocco (mobile) sui dettagli custom, oltre al tooltip hover
+  _wireDetailTips(box) {
+    box.querySelectorAll('.has-tip').forEach((el) => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const name = el.dataset.name;
+        if (!name) return;
+        // rimuovi eventuale tip precedente
+        const old = box.querySelector('.detail-tip');
+        if (old) old.remove();
+        const tip = document.createElement('div');
+        tip.className = 'detail-tip';
+        tip.textContent = name;
+        el.appendChild(tip);
+        // sparisce dopo 2 secondi
+        setTimeout(() => tip.remove(), 2000);
+      });
+    });
   }
 
   _getTodaySunTimes(sunState, now) {
@@ -1325,19 +1499,25 @@ class SunWeatherCard extends HTMLElement {
     const gMin = Math.min(...lows);
     const span = Math.max(gMax - gMin, 1);
 
-    // quanti giorni restano visibili senza scorrere (coerente con le barre):
-    // se visible_rows e' impostato, "visible" giorni riempiono la larghezza
-    // della card e il resto si raggiunge con lo scroll orizzontale.
+    // quanti giorni restano visibili senza scorrere:
+    // - se "visible_rows" e' impostato: quel numero di giorni riempie la card,
+    //   il resto si raggiunge con lo scroll.
+    // - se vuoto: tutti i giorni caricati vengono adattati alla larghezza
+    //   della card (niente scroll, niente colonne tagliate).
     const visible = this._config.visible_rows;
-    let col = 64;                   // default: larghezza comoda, scroll se non entrano
-    if (visible) {
-      const cw = list.clientWidth;
-      if (cw > 0) {
-        col = Math.max(cw / visible, 40);
-      } else {
-        // primo paint: larghezza non ancora nota, ridisegna dopo il layout
-        requestAnimationFrame(() => this._renderForecastGraph(hourly));
-      }
+    let col = 64;
+    const cs = getComputedStyle(list);
+    const padL = parseFloat(cs.paddingLeft) || 0;
+    const padR = parseFloat(cs.paddingRight) || 0;
+    const cw = list.clientWidth - padL - padR;
+    if (cw > 0) {
+      // divisore: giorni visibili impostati, oppure tutti i giorni caricati
+      const divisor = visible || days.length;
+      // arrotonda per difetto cosi' non sbava mezza colonna in piu'
+      col = Math.max(Math.floor((cw / divisor) * 100) / 100, 40);
+    } else {
+      // primo paint: larghezza non ancora nota, ridisegna dopo il layout
+      requestAnimationFrame(() => this._renderForecastGraph(hourly));
     }
     const w = days.length * col;
     const yDay = 14;                // etichetta giorno/ora
@@ -1687,7 +1867,6 @@ class SunWeatherCard extends HTMLElement {
       sun_entity: 'sun.sun',
       forecast_type: 'daily',
       forecast_days: 7,
-      visible_rows: 5,
       details: ['humidity', 'wind_bearing', 'pressure', 'wind_speed'],
     };
   }
@@ -1716,8 +1895,6 @@ const ALL_DETAILS = [
 ];
 const DETAIL_LABELS = Object.fromEntries(ALL_DETAILS);
 
-const TAP_ACTIONS = ['more-info', 'navigate', 'url', 'perform-action', 'toggle', 'none'];
-
 // Traduzioni dell'editor (it/en). L'editor segue la lingua di Home Assistant.
 const EDITOR_I18N = {
   en: {
@@ -1727,7 +1904,7 @@ const EDITOR_I18N = {
     appearance: 'Appearance',
     location: 'Location name (empty = automatic)',
     language: 'Language',
-    lang_system: 'System', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands',
+    lang_system: 'System', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands', lang_fr: 'Français',
     time_format: 'Time format',
     tf_24: '24 hours', tf_12: '12 hours',
     show_time: 'Show time',
@@ -1745,11 +1922,23 @@ const EDITOR_I18N = {
     dl_bars: 'Bars', dl_graph: 'Graph (lines)',
     days_to_load: 'Days to load',
     hours_to_load: 'Hours to load',
-    visible_rows: 'Visible rows (empty = all)',
+    visible_rows: 'Visible days (empty = all)',
     show_rain: 'Show daily rain (mm)',
     show_toggle: 'Daily/Hourly toggle in card',
     details: 'Details',
     details_hint: 'Add attributes below. Drag the chips to reorder. Tap ✕ to remove.',
+    custom_sensors: 'Custom sensors',
+    custom_sensors_hint: 'Show any sensor entity in the details grid. Pick a sensor and optionally set a name and icon.',
+    show_sensor_names: 'Show names under sensors',
+    add_sensor: 'Add sensor',
+    cs_entity: 'Sensor entity',
+    cs_attribute: 'Attribute (optional)',
+    cs_pick: 'Select a sensor…',
+    cs_name: 'Name (optional)',
+    cs_name_ph: 'e.g. Reliability',
+    cs_icon: 'Icon (optional)',
+    cs_remove: 'Remove',
+    cs_empty: 'No custom sensors yet.',
     details_empty: 'No details yet. Add attributes below.',
     all_added: '— all added —',
     interaction: 'Interaction',
@@ -1775,7 +1964,7 @@ const EDITOR_I18N = {
     appearance: 'Aspetto',
     location: 'Nome località (vuoto = automatico)',
     language: 'Lingua',
-    lang_system: 'Sistema', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch',
+    lang_system: 'Sistema', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands', lang_fr: 'Français',
     time_format: 'Formato ora',
     tf_24: '24 ore', tf_12: '12 ore',
     show_time: 'Mostra orario',
@@ -1793,11 +1982,23 @@ const EDITOR_I18N = {
     dl_bars: 'Barre', dl_graph: 'Grafico (linee)',
     days_to_load: 'Giorni da caricare',
     hours_to_load: 'Ore da caricare',
-    visible_rows: 'Righe visibili (vuoto = tutte)',
+    visible_rows: 'Giorni visibili (vuoto = tutte)',
     show_rain: 'Mostra pioggia giornaliera (mm)',
     show_toggle: 'Interruttore Giorni/Ore nella card',
     details: 'Dettagli',
     details_hint: 'Aggiungi attributi qui sotto. Trascina i chip per riordinare. Tocca ✕ per rimuovere.',
+    custom_sensors: 'Sensori personalizzati',
+    custom_sensors_hint: 'Mostra qualsiasi entità sensore nella griglia dei dettagli. Scegli un sensore e, se vuoi, imposta nome e icona.',
+    show_sensor_names: 'Mostra i nomi sotto i sensori',
+    add_sensor: 'Aggiungi sensore',
+    cs_entity: 'Entità sensore',
+    cs_attribute: 'Attributo (opzionale)',
+    cs_pick: 'Seleziona un sensore…',
+    cs_name: 'Nome (opzionale)',
+    cs_name_ph: 'es. Attendibilità',
+    cs_icon: 'Icona (opzionale)',
+    cs_remove: 'Rimuovi',
+    cs_empty: 'Nessun sensore personalizzato.',
     details_empty: 'Nessun dettaglio. Aggiungine qui sotto.',
     all_added: '— tutti aggiunti —',
     interaction: 'Interazione',
@@ -1823,7 +2024,7 @@ const EDITOR_I18N = {
     appearance: 'Darstellung',
     location: 'Ortsname (leer = automatisch)',
     language: 'Sprache',
-    lang_system: 'System', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands',
+    lang_system: 'System', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands', lang_fr: 'Français',
     time_format: 'Zeitformat',
     tf_24: '24 Stunden', tf_12: '12 Stunden',
     show_time: 'Uhrzeit anzeigen',
@@ -1841,11 +2042,23 @@ const EDITOR_I18N = {
     dl_bars: 'Balken', dl_graph: 'Diagramm (Linien)',
     days_to_load: 'Zu ladende Tage',
     hours_to_load: 'Zu ladende Stunden',
-    visible_rows: 'Sichtbare Zeilen (leer = alle)',
+    visible_rows: 'Sichtbare Tage (leer = alle)',
     show_rain: 'Tagesregen anzeigen (mm)',
     show_toggle: 'Umschalter Tage/Stunden in der Karte',
     details: 'Details',
     details_hint: 'Attribute unten hinzufügen. Chips zum Umsortieren ziehen. Zum Entfernen ✕ tippen.',
+    custom_sensors: 'Eigene Sensoren',
+    custom_sensors_hint: 'Zeige eine beliebige Sensor-Entität im Detailraster. Sensor wählen und optional Name und Symbol setzen.',
+    show_sensor_names: 'Namen unter den Sensoren anzeigen',
+    add_sensor: 'Sensor hinzufügen',
+    cs_entity: 'Sensor-Entität',
+    cs_attribute: 'Attribut (optional)',
+    cs_pick: 'Sensor auswählen…',
+    cs_name: 'Name (optional)',
+    cs_name_ph: 'z. B. Zuverlässigkeit',
+    cs_icon: 'Symbol (optional)',
+    cs_remove: 'Entfernen',
+    cs_empty: 'Noch keine eigenen Sensoren.',
     details_empty: 'Noch keine Details. Unten hinzufügen.',
     all_added: '— alle hinzugefügt —',
     interaction: 'Interaktion',
@@ -1871,7 +2084,7 @@ const EDITOR_I18N = {
     appearance: 'Weergave',
     location: 'Locatienaam (leeg = automatisch)',
     language: 'Taal',
-    lang_system: 'Systeem', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands',
+    lang_system: 'Systeem', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands', lang_fr: 'Français',
     time_format: 'Tijdnotatie',
     tf_24: '24 uur', tf_12: '12 uur',
     show_time: 'Tijd tonen',
@@ -1889,13 +2102,25 @@ const EDITOR_I18N = {
     dl_bars: 'Balken', dl_graph: 'Grafiek (lijnen)',
     days_to_load: 'Te laden dagen',
     hours_to_load: 'Te laden uren',
-    visible_rows: 'Zichtbare rijen (leeg = alle)',
+    visible_rows: 'Zichtbare dagen (leeg = alle)',
     show_rain: 'Dagelijkse neerslag tonen (mm)',
     show_toggle: 'Dagen/Uren-schakelaar in kaart',
     details: 'Details',
-    details_hint: 'Voeg hieronder attributen toe. Sleep de chips om te herordenen. Tik op ✕ om te verwijderen.',
+    details_hint: 'Voeg hieronder attributen toe. Sleep om te herordenen. Tik om te verwijderen.',
     details_empty: 'Nog geen details. Voeg hieronder attributen toe.',
     all_added: '— alle toegevoegd —',
+    custom_sensors: 'Aangepaste sensoren',
+    custom_sensors_hint: 'Toon een willekeurige sensor-entiteit in het detailraster. Kies een sensor en stel eventueel naam en icoon in.',
+    show_sensor_names: 'Namen onder de sensoren tonen',
+    add_sensor: 'Sensor toevoegen',
+    cs_entity: 'Sensor-entiteit',
+    cs_attribute: 'Attribuut (optioneel)',
+    cs_pick: 'Selecteer een sensor…',
+    cs_name: 'Naam (optioneel)',
+    cs_name_ph: 'bijv. Betrouwbaarheid',
+    cs_icon: 'Icoon (optioneel)',
+    cs_remove: 'Verwijderen',
+    cs_empty: 'Nog geen aangepaste sensoren.',
     interaction: 'Interactie',
     tap_behavior: 'Bij tikken',
     hold_behavior: 'Bij lang indrukken',
@@ -1911,6 +2136,66 @@ const EDITOR_I18N = {
     det_sunset: 'Zonsondergang', det_visibility: 'Zicht',
     det_apparent_temperature: 'Gevoelstemperatuur', det_cloud_coverage: 'Bewolking',
     det_uv_index: 'UV-index', det_dew_point: 'Dauwpunt',
+  },
+  fr: {
+    entities: 'Entités',
+    weather_entity: 'Entité météorologique',
+    sun_entity: 'Entité solaire (arc du lever/coucher du soleil)',
+    appearance: 'Apparence',
+    location: 'Nom du lieu (vide = automatique)',
+    language: 'Langue',
+    lang_system: 'Système', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands', lang_fr: 'Français',
+    time_format: "Format de l'heure",
+    tf_24: '24 heures', tf_12: '12 heures',
+    show_time: "Afficher l'heure",
+    show_date: 'Afficher la date',
+    show_arc: "Afficher l'arc solaire",
+    animated_icons: 'Icônes animées',
+    transparent: 'Fond transparent',
+    background_image: 'Image de fond (URL ou chemin /local/…)',
+    overlay: 'Superposition : plus clair ⟵ aucun ⟶ plus foncé',
+    ov_lighter: 'Plus clair', ov_zero: '0', ov_darker: 'Plus foncé',
+    forecast: 'Prévision',
+    forecast_type: 'Type de prévision',
+    ft_daily: 'Quotidienne', ft_hourly: 'Horaire',
+    daily_layout: 'Disposition quotidienne',
+    dl_bars: 'Barres', dl_graph: 'Graphique (lignes)',
+    days_to_load: 'Jours à charger',
+    hours_to_load: 'Heures à charger',
+    visible_rows: 'Jours visibles (vide = tous)',
+    show_rain: 'Afficher la pluie quotidienne (mm)',
+    show_toggle: 'Bascule Jours/Heures dans la carte',
+    details: 'Détails',
+    details_hint: 'Ajoutez des attributs ci-dessous. Faites glisser pour réorganiser. Appuyez pour supprimer.',
+    details_empty: 'Aucun détail pour le moment. Ajoutez les attributs ci-dessous.',
+    all_added: '— tout ajouté —',
+    custom_sensors: 'Capteurs personnalisés',
+    custom_sensors_hint: "Affichez n'importe quel capteur dans la grille de détails. Choisissez un capteur et, si vous le souhaitez, définissez un nom et une icône.",
+    show_sensor_names: 'Afficher les noms sous les capteurs',
+    add_sensor: 'Ajouter un capteur',
+    cs_entity: 'Entité du capteur',
+    cs_attribute: 'Attribut (optionnel)',
+    cs_pick: 'Sélectionnez un capteur…',
+    cs_name: 'Nom (optionnel)',
+    cs_name_ph: 'ex. Fiabilité',
+    cs_icon: 'Icône (optionnel)',
+    cs_remove: 'Supprimer',
+    cs_empty: 'Aucun capteur personnalisé pour le moment.',
+    interaction: 'Interaction',
+    tap_behavior: 'Comportement du clic',
+    hold_behavior: 'Comportement du maintien',
+    double_tap_behavior: 'Comportement du double-clic',
+    nav_path: 'Chemin de navigation',
+    url_label: 'URL',
+    action_srv: 'Action (domain.service)',
+    act_more_info: "Informations sur l'entité", act_navigate: 'Naviguer', act_url: 'URL',
+    act_perform: "Effectuer l'action", act_toggle: 'Basculer', act_none: 'Ne rien faire',
+    det_humidity: 'Humidité', det_pressure: 'Pression', det_wind_speed: 'Vitesse du vent',
+    det_wind_bearing: 'Direction du vent', det_precipitation: 'Précipitation (mm)',
+    det_precipitation_probability: 'Probabilité de précipitation', det_sunrise: 'Lever du soleil',
+    det_sunset: 'Coucher du soleil', det_visibility: 'Visibilité',
+    det_apparent_temperature: 'Température ressentie', det_cloud_coverage: 'Couverture nuageuse',
+    det_uv_index: 'Indice UV', det_dew_point: 'Point de rosée',
   },
 };
 
@@ -1932,16 +2217,27 @@ class SunWeatherCardEditor extends HTMLElement {
       this._render();
     } else {
       this._fillEntityPickers();
+      this._fillAppearanceForm();
+      this._fillForecastForm();
+      this._fillInteractionForm();
+      this._fillDetailsForm();
     }
   }
 
-  // lingua editor: segue HA/browser; 'it' -> italiano, 'de' -> tedesco, 'nl' -> olandese, altrimenti inglese
+  // lingua editor: segue HA/browser; 'it' -> italiano, 'de' -> tedesco, altrimenti inglese
   _lang() {
+    // rispetta la lingua scelta nella card; se 'system' (o assente), usa HA/browser
+    const cfg = this._config && this._config.language;
+    if (cfg && cfg !== 'system') return cfg;
     const l = (this._hass && this._hass.locale && this._hass.locale.language)
       || (this._hass && this._hass.language)
       || navigator.language || 'en';
     const s = String(l).toLowerCase();
-    return s.startsWith('it') ? 'it' : s.startsWith('de') ? 'de' : s.startsWith('nl') ? 'nl' : 'en';
+    return s.startsWith('it') ? 'it'
+      : s.startsWith('de') ? 'de'
+      : s.startsWith('nl') ? 'nl'
+      : s.startsWith('fr') ? 'fr'
+      : 'en';
   }
 
   t(key) {
@@ -1951,14 +2247,6 @@ class SunWeatherCardEditor extends HTMLElement {
 
   _detailLabel(k) {
     return this.t('det_' + k) || DETAIL_LABELS[k] || k;
-  }
-
-  _actionLabel(a) {
-    const map = {
-      'more-info': 'act_more_info', 'navigate': 'act_navigate', 'url': 'act_url',
-      'perform-action': 'act_perform', 'toggle': 'act_toggle', 'none': 'act_none',
-    };
-    return this.t(map[a] || a);
   }
 
   _emit() {
@@ -1978,38 +2266,226 @@ class SunWeatherCardEditor extends HTMLElement {
     this._emit();
   }
 
-  _weatherEntities() {
-    if (!this._hass) return [];
-    return Object.keys(this._hass.states).filter((e) => e.startsWith('weather.')).sort();
-  }
-
-  _sunEntities() {
-    if (!this._hass) return [];
-    return Object.keys(this._hass.states).filter((e) => e.startsWith('sun.')).sort();
-  }
-
   _fillEntityPickers() {
     if (!this.shadowRoot) return;
-    const ent = this.shadowRoot.getElementById('entity');
-    const sun = this.shadowRoot.getElementById('sun_entity');
-    if (ent && !ent.dataset.filled) {
-      const opts = this._weatherEntities();
-      if (opts.length) {
-        ent.innerHTML = opts.map((e) =>
-          `<option value="${e}" ${e === this._config.entity ? 'selected' : ''}>${e}</option>`).join('');
-        ent.dataset.filled = '1';
-      }
-    }
-    if (sun && !sun.dataset.filled) {
-      const opts = this._sunEntities();
-      const cur = this._config.sun_entity || 'sun.sun';
-      const all = opts.includes(cur) ? opts : [cur, ...opts];
-      if (all.length) {
-        sun.innerHTML = all.map((e) =>
-          `<option value="${e}" ${e === cur ? 'selected' : ''}>${e}</option>`).join('');
-        sun.dataset.filled = '1';
-      }
-    }
+    const mount = this.shadowRoot.getElementById('entities-form');
+    if (!mount || mount.dataset.filled) return;
+
+    const form = document.createElement('ha-form');
+    form.hass = this._hass;
+    form.data = {
+      entity: this._config.entity || '',
+      sun_entity: this._config.sun_entity || 'sun.sun',
+    };
+    form.schema = [
+      { name: 'entity', selector: { entity: { domain: 'weather' } } },
+      { name: 'sun_entity', selector: { entity: { domain: 'sun' } } },
+    ];
+    form.computeLabel = (s) =>
+      s.name === 'entity' ? this.t('weather_entity') : this.t('sun_entity');
+    form.addEventListener('value-changed', (e) => {
+      const v = e.detail.value || {};
+      this._set('entity', v.entity);
+      this._set('sun_entity', v.sun_entity);
+    });
+    mount.appendChild(form);
+    mount.dataset.filled = '1';
+  }
+
+  _fillAppearanceForm() {
+    if (!this.shadowRoot) return;
+    const mount = this.shadowRoot.getElementById('appearance-form');
+    if (!mount || mount.dataset.filled) return;
+    const c = this._config;
+
+    const form = document.createElement('ha-form');
+    form.hass = this._hass;
+    form.data = {
+      location: c.location || '',
+      language: c.language || 'system',
+      time_format: c.time_format || '24',
+      show_time: c.show_time !== false,
+      show_date: c.show_date !== false,
+      show_arc: c.show_arc !== false,
+      animated_icons: c.animated_icons !== false,
+      transparent: c.transparent === true,
+      background_image: c.background_image || '',
+    };
+    const sel = (opts) => ({ select: { mode: 'dropdown', options: opts } });
+    form.schema = [
+      { name: 'location', selector: { text: {} } },
+      { name: 'language', selector: sel([
+        { value: 'system', label: this.t('lang_system') },
+        { value: 'it', label: this.t('lang_it') },
+        { value: 'en', label: this.t('lang_en') },
+        { value: 'de', label: this.t('lang_de') },
+        { value: 'nl', label: this.t('lang_nl') },
+        { value: 'fr', label: this.t('lang_fr') },
+      ]) },
+      { name: 'time_format', selector: sel([
+        { value: '24', label: this.t('tf_24') },
+        { value: '12', label: this.t('tf_12') },
+      ]) },
+      { name: 'show_time', selector: { boolean: {} } },
+      { name: 'show_date', selector: { boolean: {} } },
+      { name: 'show_arc', selector: { boolean: {} } },
+      { name: 'animated_icons', selector: { boolean: {} } },
+      { name: 'transparent', selector: { boolean: {} } },
+      { name: 'background_image', selector: { text: {} } },
+    ];
+    const labels = {
+      location: this.t('location'), language: this.t('language'),
+      time_format: this.t('time_format'), show_time: this.t('show_time'),
+      show_date: this.t('show_date'), show_arc: this.t('show_arc'),
+      animated_icons: this.t('animated_icons'), transparent: this.t('transparent'),
+      background_image: this.t('background_image'),
+    };
+    form.computeLabel = (s) => labels[s.name] || s.name;
+    form.addEventListener('value-changed', (e) => {
+      const v = e.detail.value || {};
+      Object.keys(labels).forEach((k) => {
+        if (k === 'show_time' || k === 'show_date' || k === 'show_arc' || k === 'animated_icons') {
+          // toggle "attivo di default": salva solo se false
+          if (v[k] === false) this._set(k, false); else this._set(k, undefined);
+        } else if (k === 'transparent') {
+          if (v[k] === true) this._set(k, true); else this._set(k, undefined);
+        } else {
+          this._set(k, v[k]);
+        }
+      });
+      this._updateOverlayVisibility();
+    });
+    mount.appendChild(form);
+    mount.dataset.filled = '1';
+    this._updateOverlayVisibility();
+  }
+
+  // lo slider velo ha senso solo con un'immagine di sfondo impostata
+  _updateOverlayVisibility() {
+    const row = this.shadowRoot && this.shadowRoot.getElementById('overlay-row');
+    if (row) row.style.display = this._config.background_image ? '' : 'none';
+  }
+
+  _fillForecastForm() {
+    if (!this.shadowRoot) return;
+    const mount = this.shadowRoot.getElementById('forecast-form');
+    if (!mount || mount.dataset.filled) return;
+    const c = this._config;
+
+    const form = document.createElement('ha-form');
+    form.hass = this._hass;
+    form.data = {
+      forecast_type: c.forecast_type || 'daily',
+      forecast_layout: c.forecast_layout || 'bars',
+      forecast_days: c.forecast_days ?? 7,
+      forecast_hours: c.forecast_hours ?? 24,
+      visible_rows: c.visible_rows ?? null,
+      show_forecast_precipitation: c.show_forecast_precipitation !== false,
+      show_forecast_toggle: c.show_forecast_toggle === true,
+    };
+    const sel = (opts) => ({ select: { mode: 'dropdown', options: opts } });
+    const num = (min, max) => ({ number: { min, max, mode: 'box', step: 1 } });
+    form.schema = [
+      { name: 'forecast_type', selector: sel([
+        { value: 'daily', label: this.t('ft_daily') },
+        { value: 'hourly', label: this.t('ft_hourly') },
+      ]) },
+      { name: 'forecast_layout', selector: sel([
+        { value: 'bars', label: this.t('dl_bars') },
+        { value: 'graph', label: this.t('dl_graph') },
+      ]) },
+      { name: 'visible_rows', selector: num(1, 15) },
+      { name: 'forecast_days', selector: num(1, 15) },
+      { name: 'forecast_hours', selector: num(1, 48) },
+      { name: 'show_forecast_precipitation', selector: { boolean: {} } },
+      { name: 'show_forecast_toggle', selector: { boolean: {} } },
+    ];
+    const labels = {
+      forecast_type: this.t('forecast_type'), forecast_layout: this.t('daily_layout'),
+      forecast_days: this.t('days_to_load'), forecast_hours: this.t('hours_to_load'),
+      visible_rows: this.t('visible_rows'),
+      show_forecast_precipitation: this.t('show_rain'),
+      show_forecast_toggle: this.t('show_toggle'),
+    };
+    form.computeLabel = (s) => labels[s.name] || s.name;
+    form.addEventListener('value-changed', (e) => {
+      const v = e.detail.value || {};
+      this._set('forecast_type', v.forecast_type);
+      this._set('forecast_layout', v.forecast_layout);
+      this._set('forecast_days', v.forecast_days);
+      this._set('forecast_hours', v.forecast_hours);
+      // visible_rows: vuoto/null = mostra tutte
+      this._set('visible_rows', (v.visible_rows === null || v.visible_rows === undefined || v.visible_rows === '') ? undefined : v.visible_rows);
+      // show_rain e' attivo di default: salva solo se false
+      this._set('show_forecast_precipitation', v.show_forecast_precipitation === false ? false : undefined);
+      // show_toggle e' spento di default: salva solo se true
+      this._set('show_forecast_toggle', v.show_forecast_toggle === true ? true : undefined);
+    });
+    mount.appendChild(form);
+    mount.dataset.filled = '1';
+  }
+
+  _fillInteractionForm() {
+    if (!this.shadowRoot) return;
+    const mount = this.shadowRoot.getElementById('interaction-form');
+    if (!mount || mount.dataset.filled) return;
+    const c = this._config;
+
+    const form = document.createElement('ha-form');
+    form.hass = this._hass;
+    form.data = {
+      tap_action: c.tap_action || { action: 'more-info' },
+      hold_action: c.hold_action || { action: 'none' },
+      double_tap_action: c.double_tap_action || { action: 'none' },
+    };
+    form.schema = [
+      { name: 'tap_action', selector: { ui_action: {} } },
+      { name: 'hold_action', selector: { ui_action: {} } },
+      { name: 'double_tap_action', selector: { ui_action: {} } },
+    ];
+    const labels = {
+      tap_action: this.t('tap_behavior'),
+      hold_action: this.t('hold_behavior'),
+      double_tap_action: this.t('double_tap_behavior'),
+    };
+    form.computeLabel = (s) => labels[s.name] || s.name;
+    form.addEventListener('value-changed', (e) => {
+      const v = e.detail.value || {};
+      this._set('tap_action', v.tap_action);
+      this._set('hold_action', v.hold_action);
+      this._set('double_tap_action', v.double_tap_action);
+    });
+    mount.appendChild(form);
+    mount.dataset.filled = '1';
+  }
+
+  _fillDetailsForm() {
+    if (!this.shadowRoot) return;
+    const mount = this.shadowRoot.getElementById('details-form');
+    if (!mount || mount.dataset.filled) return;
+
+    const form = document.createElement('ha-form');
+    form.hass = this._hass;
+    form.data = { details: this._config.details || [] };
+    // selettore nativo multi-scelta e riordinabile (drag&drop nativo di HA)
+    form.schema = [{
+      name: 'details',
+      selector: {
+        select: {
+          multiple: true,
+          reorder: true,
+          mode: 'list',
+          options: ALL_DETAILS.map(([k]) => ({ value: k, label: this._detailLabel(k) })),
+        },
+      },
+    }];
+    form.computeLabel = () => '';
+    form.addEventListener('value-changed', (e) => {
+      const v = e.detail.value || {};
+      this._set('details', Array.isArray(v.details) ? v.details : []);
+    });
+    mount.appendChild(form);
+    mount.dataset.filled = '1';
   }
 
   _render() {
@@ -2078,93 +2554,73 @@ class SunWeatherCardEditor extends HTMLElement {
         .switch { display: flex; align-items: center; gap: 8px; color: var(--primary-text-color); font-size: 0.9em; }
         .hint { font-size: 0.78em; color: var(--secondary-text-color); }
 
-        .det-active { display: flex; flex-wrap: wrap; gap: 8px; }
-        .det-chip {
-          display: inline-flex; align-items: center; gap: 8px;
-          padding: 7px 10px; border-radius: 999px;
-          background: var(--secondary-background-color, #e8eaed);
-          font-size: 0.88em; font-weight: 600;
+        .custom-row {
+          border: 1px solid var(--divider-color, #ccc);
+          border-radius: 8px; padding: 10px; margin-bottom: 10px;
+          display: flex; flex-direction: column; gap: 8px;
+        }
+        .cs-remove {
+          align-self: flex-end;
+          background: none; border: none; cursor: pointer;
+          color: var(--error-color, #c0392b); font: inherit; padding: 2px 4px;
+        }
+        .cs-combo { position: relative; }
+        .cs-dropdown {
+          display: none; position: absolute; left: 0; right: 0; top: 100%;
+          z-index: 10; max-height: 220px; overflow-y: auto;
+          background: var(--card-background-color, #fff);
+          border: 1px solid var(--divider-color, #ccc);
+          border-radius: 8px; margin-top: 2px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .cs-dropdown.open { display: block; }
+        .cs-opt {
+          padding: 8px 10px; cursor: pointer; display: flex; flex-direction: column;
+          border-bottom: 1px solid var(--divider-color, #eee);
+        }
+        .cs-opt:last-child { border-bottom: none; }
+        .cs-opt:hover { background: var(--secondary-background-color, #f0f0f0); }
+        .cs-opt b { font-weight: 600; font-size: 0.9em; }
+        .cs-opt span { font-size: 0.75em; color: var(--secondary-text-color); }
+        .cs-icon-wrap { display: flex; align-items: center; gap: 8px; }
+        .cs-name-native {
+          width: 100%; box-sizing: border-box;
+          padding: 14px 12px 12px;
+          border: none;
+          border-bottom: 1px solid var(--mdc-text-field-idle-line-color, rgba(0,0,0,0.42));
+          border-radius: 4px 4px 0 0;
+          background: var(--mdc-text-field-fill-color, rgba(0,0,0,0.04));
           color: var(--primary-text-color);
-          cursor: grab; user-select: none;
+          font: inherit; font-size: 1em;
         }
-        .det-chip.dragging { opacity: 0.4; cursor: grabbing; }
-        .det-chip.drop-target { box-shadow: inset 0 0 0 2px var(--primary-color, #03a9f4); }
-        .det-chip button {
-          border: none; background: transparent; cursor: pointer;
-          font-size: 1em; line-height: 1; padding: 0; margin: 0;
-          color: var(--secondary-text-color); display: inline-flex;
+        .cs-name-native:focus {
+          outline: none;
+          border-bottom: 2px solid var(--primary-color, #03a9f4);
         }
-        .det-chip button:hover { color: var(--primary-text-color); }
-        .det-add { display: flex; gap: 8px; margin-top: 8px; }
-        .det-add select { flex: 1; }
-        .det-add button {
-          border: none; background: transparent; cursor: pointer;
-          font-size: 1.1em; line-height: 1; padding: 2px 8px;
-          color: var(--secondary-text-color); border-radius: 4px;
+        .cs-icon-wrap .cs-icon { flex: 1; }
+        .cs-icon-preview { --mdc-icon-size: 24px; color: var(--primary-text-color); flex: none; }
+        .add-custom-btn {
+          margin-top: 4px; padding: 8px 12px; border-radius: 8px;
+          border: 1px dashed var(--primary-color, #03a9f4);
+          background: none; color: var(--primary-color, #03a9f4);
+          cursor: pointer; font: inherit; width: 100%;
         }
-        .det-add button:hover { background: var(--divider-color, #ddd); }
         .det-empty { font-size: 0.85em; color: var(--secondary-text-color); font-style: italic; }
       </style>
       <div class="editor">
 
-        <details class="group" open>
+        <details class="group">
           <summary>${this.t('entities')}</summary>
           <div class="grp-body">
-            <div class="row">
-              <label>${this.t('weather_entity')}</label>
-              <select id="entity"></select>
-            </div>
-            <div class="row">
-              <label>${this.t('sun_entity')}</label>
-              <select id="sun_entity"></select>
-            </div>
+            <div id="entities-form"></div>
           </div>
         </details>
 
         <details class="group">
           <summary>${this.t('appearance')}</summary>
           <div class="grp-body">
-            <div class="row">
-              <label>${this.t('location')}</label>
-              <input type="text" id="location" value="${c.location || ''}" placeholder="automatic">
-            </div>
-            <div class="row inline">
-              <label>${this.t('language')}</label>
-              <select id="language">
-                <option value="system" ${lang === 'system' ? 'selected' : ''}>${this.t('lang_system')}</option>
-                <option value="it" ${lang === 'it' ? 'selected' : ''}>${this.t('lang_it')}</option>
-                <option value="en" ${lang === 'en' ? 'selected' : ''}>${this.t('lang_en')}</option>
-                <option value="de" ${lang === 'de' ? 'selected' : ''}>${this.t('lang_de')}</option>
-                <option value="nl" ${lang === 'nl' ? 'selected' : ''}>${this.t('lang_nl')}</option>
-              </select>
-            </div>
-            <div class="row inline">
-              <label>${this.t('time_format')}</label>
-              <select id="time_format">
-                <option value="24" ${tf === '24' ? 'selected' : ''}>${this.t('tf_24')}</option>
-                <option value="12" ${tf === '12' ? 'selected' : ''}>${this.t('tf_12')}</option>
-              </select>
-            </div>
-            <div class="row inline">
-              <label class="switch"><input type="checkbox" id="show_time" ${c.show_time !== false ? 'checked' : ''}> ${this.t('show_time')}</label>
-            </div>
-            <div class="row inline">
-              <label class="switch"><input type="checkbox" id="show_date" ${c.show_date !== false ? 'checked' : ''}> ${this.t('show_date')}</label>
-            </div>
-            <div class="row inline">
-              <label class="switch"><input type="checkbox" id="show_arc" ${c.show_arc !== false ? 'checked' : ''}> ${this.t('show_arc')}</label>
-            </div>
-            <div class="row inline">
-              <label class="switch"><input type="checkbox" id="animated_icons" ${c.animated_icons !== false ? 'checked' : ''}> ${this.t('animated_icons')}</label>
-            </div>
-            <div class="row inline">
-              <label class="switch"><input type="checkbox" id="transparent" ${c.transparent === true ? 'checked' : ''}> ${this.t('transparent')}</label>
-            </div>
-            <div class="row">
-              <label>${this.t('background_image')}</label>
-              <input type="text" id="background_image" value="${c.background_image || ''}" placeholder="/local/bg.jpg">
-            </div>
-            <div class="row">
+            <div id="appearance-form"></div>
+            <div class="row" id="overlay-row" style="display:none;">
               <label>${this.t('overlay')}</label>
               <div class="ov-slider">
                 <span class="ov-tick"></span>
@@ -2178,38 +2634,7 @@ class SunWeatherCardEditor extends HTMLElement {
         <details class="group">
           <summary>${this.t('forecast')}</summary>
           <div class="grp-body">
-            <div class="row inline">
-              <label>${this.t('forecast_type')}</label>
-              <select id="forecast_type">
-                <option value="daily" ${ft === 'daily' ? 'selected' : ''}>${this.t('ft_daily')}</option>
-                <option value="hourly" ${ft === 'hourly' ? 'selected' : ''}>${this.t('ft_hourly')}</option>
-              </select>
-            </div>
-            <div class="row inline">
-              <label>${this.t('daily_layout')}</label>
-              <select id="forecast_layout">
-                <option value="bars" ${(c.forecast_layout || 'bars') === 'bars' ? 'selected' : ''}>${this.t('dl_bars')}</option>
-                <option value="graph" ${c.forecast_layout === 'graph' ? 'selected' : ''}>${this.t('dl_graph')}</option>
-              </select>
-            </div>
-            <div class="row inline">
-              <label>${this.t('days_to_load')}</label>
-              <input type="number" id="forecast_days" min="1" max="15" value="${c.forecast_days ?? 7}">
-            </div>
-            <div class="row inline">
-              <label>${this.t('hours_to_load')}</label>
-              <input type="number" id="forecast_hours" min="1" max="48" value="${c.forecast_hours ?? 24}">
-            </div>
-            <div class="row inline">
-              <label>${this.t('visible_rows')}</label>
-              <input type="number" id="visible_rows" min="1" max="15" value="${c.visible_rows ?? ''}" placeholder="all">
-            </div>
-            <div class="row inline">
-              <label class="switch"><input type="checkbox" id="show_forecast_precipitation" ${c.show_forecast_precipitation !== false ? 'checked' : ''}> ${this.t('show_rain')}</label>
-            </div>
-            <div class="row inline">
-              <label class="switch"><input type="checkbox" id="show_forecast_toggle" ${c.show_forecast_toggle ? 'checked' : ''}> ${this.t('show_toggle')}</label>
-            </div>
+            <div id="forecast-form"></div>
           </div>
         </details>
 
@@ -2217,32 +2642,24 @@ class SunWeatherCardEditor extends HTMLElement {
           <summary>${this.t('details')}</summary>
           <div class="grp-body">
             <div class="hint">${this.t('details_hint')}</div>
-            <div class="det-active" id="det-active"></div>
-            <div class="det-add">
-              <select id="det-add-select"></select>
-              <button type="button" id="det-add-btn" title="Add">\uFF0B</button>
-            </div>
+            <div id="details-form"></div>
+          </div>
+        </details>
+
+        <details class="group">
+          <summary>${this.t('custom_sensors')}</summary>
+          <div class="grp-body">
+            <div class="hint">${this.t('custom_sensors_hint')}</div>
+            <div id="custom-names-toggle"></div>
+            <div id="custom-list"></div>
+            <button type="button" class="add-custom-btn" id="add-custom-btn">\uFF0B ${this.t('add_sensor')}</button>
           </div>
         </details>
 
         <details class="group">
           <summary>${this.t('interaction')}</summary>
           <div class="grp-body">
-            <div class="row inline">
-              <label>${this.t('tap_behavior')}</label>
-              <select id="tap_action_type"></select>
-            </div>
-            <div class="row" id="tap_extra"></div>
-            <div class="row inline">
-              <label>${this.t('hold_behavior')}</label>
-              <select id="hold_action_type"></select>
-            </div>
-            <div class="row" id="hold_extra"></div>
-            <div class="row inline">
-              <label>${this.t('double_tap_behavior')}</label>
-              <select id="double_tap_action_type"></select>
-            </div>
-            <div class="row" id="double_tap_extra"></div>
+            <div id="interaction-form"></div>
           </div>
         </details>
 
@@ -2250,10 +2667,11 @@ class SunWeatherCardEditor extends HTMLElement {
     `;
 
     this._fillEntityPickers();
-    this._renderDetailsEditor();
-    this._renderActionEditor('tap_action');
-    this._renderActionEditor('hold_action');
-    this._renderActionEditor('double_tap_action');
+    this._fillAppearanceForm();
+    this._fillForecastForm();
+    this._fillInteractionForm();
+    this._fillDetailsForm();
+    this._renderCustomEditor();
     this._wire();
   }
 
@@ -2262,157 +2680,127 @@ class SunWeatherCardEditor extends HTMLElement {
       const el = this.shadowRoot.getElementById(id);
       if (el) el.addEventListener(ev, fn);
     };
-    bind('entity', 'change', (e) => this._set('entity', e.target.value));
-    bind('sun_entity', 'change', (e) => this._set('sun_entity', e.target.value));
-    bind('location', 'input', (e) => this._set('location', e.target.value));
-    bind('language', 'change', (e) => this._set('language', e.target.value));
-    bind('time_format', 'change', (e) => this._set('time_format', e.target.value));
-    bind('show_time', 'change', (e) => this._set('show_time', e.target.checked));
-    bind('show_date', 'change', (e) => this._set('show_date', e.target.checked));
-    bind('show_arc', 'change', (e) => this._set('show_arc', e.target.checked));
-    bind('animated_icons', 'change', (e) => this._set('animated_icons', e.target.checked));
-    bind('transparent', 'change', (e) => this._set('transparent', e.target.checked));
-    bind('background_image', 'input', (e) => this._set('background_image', e.target.value));
     bind('background_overlay', 'input', (e) => this._set('background_overlay', Number(e.target.value)));
-    bind('forecast_type', 'change', (e) => this._set('forecast_type', e.target.value));
-    bind('forecast_layout', 'change', (e) => this._set('forecast_layout', e.target.value));
-    bind('forecast_days', 'input', (e) => this._set('forecast_days', e.target.value === '' ? '' : Number(e.target.value)));
-    bind('forecast_hours', 'input', (e) => this._set('forecast_hours', e.target.value === '' ? '' : Number(e.target.value)));
-    bind('visible_rows', 'input', (e) => this._set('visible_rows', e.target.value === '' ? '' : Number(e.target.value)));
-    bind('show_forecast_precipitation', 'change', (e) => this._set('show_forecast_precipitation', e.target.checked));
-    bind('show_forecast_toggle', 'change', (e) => this._set('show_forecast_toggle', e.target.checked));
-    bind('det-add-btn', 'click', () => {
-      const sel = this.shadowRoot.getElementById('det-add-select');
-      if (sel && sel.value) {
-        this._config.details = [...(this._config.details || []), sel.value];
-        this._emit();
-        this._renderDetailsEditor();
+    bind('add-custom-btn', 'click', () => this._addCustom());
+  }
+
+  /* ---- Sensori personalizzati ---- */
+  _renderCustomEditor() {
+    // toggle "mostra nomi sotto i sensori" (ha-form nativo)
+    const tmount = this.shadowRoot.getElementById('custom-names-toggle');
+    if (tmount && !tmount.dataset.filled) {
+      const tform = document.createElement('ha-form');
+      tform.hass = this._hass;
+      tform.data = { show_sensor_names: this._config.show_sensor_names !== false };
+      tform.schema = [{ name: 'show_sensor_names', selector: { boolean: {} } }];
+      tform.computeLabel = () => this.t('show_sensor_names');
+      tform.addEventListener('value-changed', (e) => {
+        const v = (e.detail.value || {}).show_sensor_names;
+        // ON e' il default: salva solo se OFF
+        this._set('show_sensor_names', v === false ? false : undefined);
+      });
+      tmount.appendChild(tform);
+      tmount.dataset.filled = '1';
+    }
+
+    const list = this.shadowRoot.getElementById('custom-list');
+    if (!list) return;
+    const items = this._config.custom_details || [];
+
+    if (!items.length) {
+      list.innerHTML = `<div class="det-empty">${this.t('cs_empty')}</div>`;
+      return;
+    }
+
+    list.innerHTML = '';
+    items.forEach((c, i) => {
+      const row = document.createElement('div');
+      row.className = 'custom-row';
+      row.dataset.index = i;
+
+      // ha-form nativo: entita', attributo (opzionale), nome, icona
+      const form = document.createElement('ha-form');
+      form.hass = this._hass;
+      form.data = {
+        entity: c.entity || '',
+        attribute: c.attribute || '',
+        name: c.name || '',
+        icon: c.icon || '',
+      };
+      // il selettore attributo mostra gli attributi dell'entita' scelta;
+      // compare solo quando un'entita' e' gia' selezionata
+      const schema = [
+        { name: 'entity', selector: { entity: {} } },
+      ];
+      if (c.entity) {
+        schema.push({
+          name: 'attribute',
+          selector: { attribute: { entity_id: c.entity } },
+        });
       }
-    });
-    ['tap_action', 'hold_action', 'double_tap_action'].forEach((key) => {
-      bind(`${key}_type`, 'change', (e) => {
-        this._config[key] = { action: e.target.value };
+      schema.push(
+        { name: 'name', selector: { text: {} } },
+        { name: 'icon', selector: { icon: {} } },
+      );
+      form.schema = schema;
+      form.computeLabel = (s) => {
+        if (s.name === 'entity') return this.t('cs_entity');
+        if (s.name === 'attribute') return this.t('cs_attribute');
+        if (s.name === 'name') return this.t('cs_name');
+        if (s.name === 'icon') return this.t('cs_icon');
+        return s.name;
+      };
+      form.addEventListener('value-changed', (e) => {
+        const v = e.detail.value || {};
+        const arr = [...(this._config.custom_details || [])];
+        const prevEntity = arr[i] && arr[i].entity;
+        arr[i] = {};
+        if (v.entity) arr[i].entity = v.entity;
+        if (v.attribute) arr[i].attribute = v.attribute;
+        if (v.name) arr[i].name = v.name;
+        if (v.icon) arr[i].icon = v.icon;
+        this._config.custom_details = arr;
         this._emit();
-        this._renderActionEditor(key);
+        // se e' cambiata l'entita', ridisegna cosi' il menu attributi si aggiorna
+        if (v.entity !== prevEntity) this._renderCustomEditor();
       });
+
+      const rm = document.createElement('button');
+      rm.type = 'button';
+      rm.className = 'cs-remove';
+      rm.textContent = `\u2715 ${this.t('cs_remove')}`;
+      rm.addEventListener('click', () => this._removeCustom(i));
+
+      row.appendChild(form);
+      row.appendChild(rm);
+      list.appendChild(row);
     });
   }
 
-  /* ---- Dettagli (chips + drag&drop) ---- */
-  _renderDetailsEditor() {
-    const active = this._config.details || [];
-    const box = this.shadowRoot.getElementById('det-active');
-    if (box) {
-      box.innerHTML = active.length
-        ? active.map((key, i) => `
-          <span class="det-chip" draggable="true" data-index="${i}">
-            ${this._detailLabel(key)}
-            <button type="button" data-remove="${i}" title="Remove">\u2715</button>
-          </span>`).join('')
-        : `<div class="det-empty">${this.t('details_empty')}</div>`;
-
-      box.querySelectorAll('button[data-remove]').forEach((b) =>
-        b.addEventListener('click', (e) => { e.stopPropagation(); this._removeDetail(+b.dataset.remove); }));
-      this._wireDragAndDrop(box);
-    }
-
-    const sel = this.shadowRoot.getElementById('det-add-select');
-    if (sel) {
-      const avail = ALL_DETAILS.filter(([k]) => !active.includes(k));
-      sel.innerHTML = avail.length
-        ? avail.map(([k]) => `<option value="${k}">${this._detailLabel(k)}</option>`).join('')
-        : `<option value="">${this.t('all_added')}</option>`;
-    }
-  }
-
-  _wireDragAndDrop(box) {
-    let dragFrom = null;
-    box.querySelectorAll('.det-chip').forEach((chip) => {
-      chip.addEventListener('dragstart', (e) => {
-        dragFrom = +chip.dataset.index;
-        chip.classList.add('dragging');
-        e.dataTransfer.effectAllowed = 'move';
-      });
-      chip.addEventListener('dragend', () => {
-        chip.classList.remove('dragging');
-        box.querySelectorAll('.det-chip').forEach((c) => c.classList.remove('drop-target'));
-      });
-      chip.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        if (+chip.dataset.index !== dragFrom) chip.classList.add('drop-target');
-      });
-      chip.addEventListener('dragleave', () => chip.classList.remove('drop-target'));
-      chip.addEventListener('drop', (e) => {
-        e.preventDefault();
-        const to = +chip.dataset.index;
-        if (dragFrom === null || dragFrom === to) return;
-        this._reorderDetail(dragFrom, to);
-      });
-    });
-  }
-
-  _reorderDetail(from, to) {
-    const arr = [...(this._config.details || [])];
-    const [moved] = arr.splice(from, 1);
-    arr.splice(to, 0, moved);
-    this._config.details = arr;
+  _addCustom() {
+    const arr = [...(this._config.custom_details || [])];
+    arr.push({ entity: '' });
+    this._config.custom_details = arr;
     this._emit();
-    this._renderDetailsEditor();
+    this._renderCustomEditor();
   }
 
-  _removeDetail(index) {
-    const arr = [...(this._config.details || [])];
+  _setCustom(index, key, value) {
+    const arr = [...(this._config.custom_details || [])];
+    if (!arr[index]) return;
+    arr[index] = { ...arr[index] };
+    if (value === '' || value == null) delete arr[index][key];
+    else arr[index][key] = value;
+    this._config.custom_details = arr;
+    this._emit();
+  }
+
+  _removeCustom(index) {
+    const arr = [...(this._config.custom_details || [])];
     arr.splice(index, 1);
-    this._config.details = arr;
+    this._config.custom_details = arr;
     this._emit();
-    this._renderDetailsEditor();
-  }
-
-  /* ---- Azioni (tap / hold / double tap) ---- */
-  _actionOf(key) {
-    const def = key === 'tap_action' ? { action: 'more-info' } : { action: 'none' };
-    return this._config[key] || def;
-  }
-
-  _setAction(key, patch) {
-    const cur = { ...this._actionOf(key), ...patch };
-    this._config[key] = cur;
-    this._emit();
-  }
-
-  _renderActionEditor(key) {
-    const typeSel = this.shadowRoot.getElementById(`${key}_type`);
-    const extra = this.shadowRoot.getElementById(`${key}_extra`);
-    const act = this._actionOf(key);
-    const type = act.action || (key === 'tap_action' ? 'more-info' : 'none');
-
-    if (typeSel && !typeSel.dataset.filled) {
-      typeSel.innerHTML = TAP_ACTIONS.map((v) =>
-        `<option value="${v}" ${v === type ? 'selected' : ''}>${this._actionLabel(v)}</option>`).join('');
-      typeSel.dataset.filled = '1';
-    } else if (typeSel) {
-      typeSel.value = type;
-    }
-
-    if (!extra) return;
-    let html = '';
-    if (type === 'navigate') {
-      html = `<label>${this.t('nav_path')}</label><input type="text" id="${key}_nav" value="${act.navigation_path || ''}" placeholder="/lovelace/0">`;
-    } else if (type === 'url') {
-      html = `<label>${this.t('url_label')}</label><input type="text" id="${key}_url" value="${act.url_path || ''}" placeholder="https://...">`;
-    } else if (type === 'perform-action') {
-      html = `<label>${this.t('action_srv')}</label><input type="text" id="${key}_srv" value="${act.perform_action || act.service || ''}" placeholder="script.my_script">`;
-    }
-    // more-info e toggle usano automaticamente l'entità meteo scelta sopra
-    extra.innerHTML = html;
-
-    const b = (id, patchKey) => {
-      const el = this.shadowRoot.getElementById(id);
-      if (el) el.addEventListener('input', (e) => this._setAction(key, { [patchKey]: e.target.value }));
-    };
-    b(`${key}_nav`, 'navigation_path');
-    b(`${key}_url`, 'url_path');
-    b(`${key}_srv`, 'perform_action');
+    this._renderCustomEditor();
   }
 }
 
@@ -2426,7 +2814,7 @@ window.customCards.push({
 });
 
 console.info(
-  '%c SUN-WEATHER-CARD %c 1.3.0 ',
+  '%c SUN-WEATHER-CARD %c 1.5.0 ',
   'color: white; background: #ff7a59; font-weight: 700;',
   'color: #ff7a59; background: #1c1c1c; font-weight: 700;'
 );

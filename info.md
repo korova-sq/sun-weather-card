@@ -9,7 +9,9 @@ forecasts as iOS‑style bars or a smooth line graph. Configurable from the UI.
 - Transparent background or a custom background image with a light/dark overlay
 - Pick which detail attributes to show (they appear only if your integration
   provides them)
-- Italian, English or German / system language
+- Add custom sensors — any entity or one of its attributes (e.g. the sun's
+  elevation or next dawn) — with an optional name and icon
+- Italian, English, German, Dutch or French / system language
 - Tap, hold and double‑tap actions
 - Full visual editor
 
