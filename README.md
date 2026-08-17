@@ -21,6 +21,8 @@ Sun Weather Card is a weather card for [Home Assistant](https://www.home-assista
 
 Most weather cards on HACS show the forecast as a plain list. This card focuses on a clean, iOS‑inspired look — with the sun's path, animated icons and a fully visual editor — designed for dashboards where you want the weather to look good and read instantly, without touching YAML.
 
+<br>
+
 <!--
   SCREENSHOTS
   Row 1: bars layout (daily + hourly). Row 2: graph layout (daily + hourly).
@@ -36,7 +38,7 @@ Most weather cards on HACS show the forecast as a plain list. This card focuses 
   <img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/hourly-graph.png" width="300" alt="Graph layout – hourly forecast" />
 </p>
 
----
+<br>
 
 ## ✨ Features
 
@@ -190,6 +192,17 @@ tap_action:
 
 ---
 
+## 💬 Discussion
+
+Discussion and support thread on the Home Assistant community forum:
+[Sun Weather Card on the HA community](https://community.home-assistant.io/t/sun-weather-card-weather-card-with-sunrise-sunset-arc-bars-or-graph-forecast/1017126)
+
+## ☕ Support
+
+If you enjoy this card and want to say thanks, a coffee is always welcome!
+
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-korova.sq-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/korova.sq)
+
 ## License
 
-MIT
+[MIT](LICENSE) © 2026 korova-sq
