@@ -5,7 +5,17 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-korova.sq-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/korova.sq)
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/banner.png" alt="Sun Weather Card" />
+</p>
+
 A weather card for [Home Assistant](https://www.home-assistant.io/) with an animated current‑conditions header, a sunrise/sunset arc, and daily or hourly forecasts shown as iOS‑style bars or a smooth line graph. Fully configurable from the UI editor.
+
+## 🤔 What is Sun Weather Card?
+
+Sun Weather Card is a weather card for [Home Assistant](https://www.home-assistant.io/) that puts the whole day at a glance: an animated current‑conditions header, a sunrise/sunset arc, and daily or hourly forecasts shown as iOS‑style bars or a smooth line graph.
+
+Most weather cards on HACS show the forecast as a plain list. This card focuses on a clean, iOS‑inspired look — with the sun's path, animated icons and a fully visual editor — designed for dashboards where you want the weather to look good and read instantly, without touching YAML.
 
 <!--
   SCREENSHOTS
@@ -24,20 +34,20 @@ A weather card for [Home Assistant](https://www.home-assistant.io/) with an anim
 
 ---
 
-## Features
+## ✨ Features
 
-- **Current conditions header** – time, date, animated weather icon, current temperature, today's high/low and the location name.
-- **Sunrise/sunset arc** – a light dotted arc with the sun (or moon at night) moving along it between sunrise and sunset.
-- **Configurable details** – pick which attributes to show below the arc (humidity, pressure, wind, precipitation, UV, sunrise/sunset and more), shown as a tidy grid. Each attribute (humidity, pressure, wind, precipitation, UV index, etc.) is shown only if your weather integration provides it.
-- **Daily & hourly forecast** – choose `daily` or `hourly`.
-- **Two layouts** – classic **bars** (iOS‑style temperature range bars) or a **graph** (smooth temperature line, with max/min lines for daily).
-- **Original animated SVG icons** for sun, moon, clouds, rain, snow, fog, wind and lightning. No external assets — animations can be turned off for lower-end devices.
-- **Transparent or image background** – make the card blend into your dashboard, or set a background image with an adjustable light/dark overlay for readability.
-- **Custom sensors** – add any entity (or a specific attribute of it, e.g. the sun's elevation or next dawn) to the details, with an optional name and icon. Shown in their own row; names can be displayed under each value or on tap.
-- **Multi‑language** – card content in Italian, English, German, Dutch or French, or follow your Home Assistant system language. The UI editor follows the card language.
-- **Tap / hold / double‑tap actions** – standard Home Assistant actions (more‑info, navigate, url, perform‑action, toggle).
-- **Show only what you need** – time, date and the sun arc can each be turned on or off, and you choose exactly which detail attributes to display.
-- **UI editor** – configure everything without touching YAML.
+- 🌤️ **Current conditions header** – time, date, animated weather icon, current temperature, today's high/low and the location name.
+- 🌅 **Sunrise/sunset arc** – a light dotted arc with the sun (or moon at night) moving along it between sunrise and sunset.
+- 📊 **Configurable details** – pick which attributes to show below the arc (humidity, pressure, wind, precipitation, UV, sunrise/sunset and more), shown as a tidy grid. Each attribute is shown only if your weather integration provides it.
+- 📅 **Daily & hourly forecast** – choose `daily` or `hourly`.
+- 📈 **Two layouts** – classic **bars** (iOS‑style temperature range bars) or a **graph** (smooth temperature line, with max/min lines for daily).
+- 🎨 **Original animated SVG icons** for sun, moon, clouds, rain, snow, fog, wind and lightning. No external assets — animations can be turned off for lower-end devices.
+- 🖼️ **Transparent or image background** – make the card blend into your dashboard, or set a background image with an adjustable light/dark overlay for readability.
+- 🔧 **Custom sensors** – add any entity (or a specific attribute of it, e.g. the sun's elevation or next dawn) to the details, with an optional name and icon. Shown in their own row; names can be displayed under each value or on tap.
+- 🌍 **Multi‑language** – card content in Italian, English, German, Dutch or French, or follow your Home Assistant system language. The UI editor follows the card language.
+- 👆 **Tap / hold / double‑tap actions** – standard Home Assistant actions (more‑info, navigate, url, perform‑action, toggle).
+- 👁️ **Show only what you need** – time, date and the sun arc can each be turned on or off, and you choose exactly which detail attributes to display.
+- 🛠 **Visual editor** – configure everything without touching YAML.
 
 ---
 
