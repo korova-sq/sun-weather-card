@@ -1,13 +1,19 @@
 # Sun Weather Card
 
+<br>
+
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
 [![GitHub Release](https://img.shields.io/github/v/release/korova-sq/sun-weather-card)](https://github.com/korova-sq/sun-weather-card/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-korova.sq-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/korova.sq)
 
+<br>
+
 <p align="center">
   <img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/banner.png" alt="Sun Weather Card" />
 </p>
+
+<br>
 
 ## 🤔 What is Sun Weather Card?
 
