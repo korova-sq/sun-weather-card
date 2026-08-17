@@ -9,12 +9,12 @@ A weather card for [Home Assistant](https://www.home-assistant.io/) with an anim
   A light/dark pair is shown further down in the "Themes" section.
 -->
 <p align="center">
-  <img src="images/daily-bars.png" width="300" alt="Bars layout – daily forecast" />
-  <img src="images/hourly-bars.png" width="300" alt="Bars layout – hourly forecast" />
+  <img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/daily-bars.png" width="300" alt="Bars layout – daily forecast" />
+  <img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/hourly-bars.png" width="300" alt="Bars layout – hourly forecast" />
 </p>
 <p align="center">
-  <img src="images/daily-graph.png" width="300" alt="Graph layout – daily forecast" />
-  <img src="images/hourly-graph.png" width="300" alt="Graph layout – hourly forecast" />
+  <img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/daily-graph.png" width="300" alt="Graph layout – daily forecast" />
+  <img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/hourly-graph.png" width="300" alt="Graph layout – hourly forecast" />
 </p>
 
 ---
@@ -41,8 +41,8 @@ A weather card for [Home Assistant](https://www.home-assistant.io/) with an anim
 The card automatically follows your Home Assistant theme — light or dark.
 
 <p align="center">
-  <img src="images/theme-light.png" width="300" alt="Light theme" />
-  <img src="images/theme-dark.png" width="300" alt="Dark theme" />
+  <img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/theme-light.png" width="300" alt="Light theme" />
+  <img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/theme-dark.png" width="300" alt="Dark theme" />
 </p>
 
 ---
