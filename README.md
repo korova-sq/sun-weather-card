@@ -9,8 +9,6 @@
   <img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/banner.png" alt="Sun Weather Card" />
 </p>
 
-A weather card for [Home Assistant](https://www.home-assistant.io/) with an animated current‑conditions header, a sunrise/sunset arc, and daily or hourly forecasts shown as iOS‑style bars or a smooth line graph. Fully configurable from the UI editor.
-
 ## 🤔 What is Sun Weather Card?
 
 Sun Weather Card is a weather card for [Home Assistant](https://www.home-assistant.io/) that puts the whole day at a glance: an animated current‑conditions header, a sunrise/sunset arc, and daily or hourly forecasts shown as iOS‑style bars or a smooth line graph.
