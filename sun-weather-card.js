@@ -112,7 +112,7 @@ const UI_LABELS = {
   en: { sunrise: 'sunrise', sunset: 'sunset', daily: 'Daily', hourly: 'Hourly' },
   de: { sunrise: 'Sonnenaufgang', sunset: 'Sonnenuntergang', daily: 'Tage', hourly: 'Stunden' },
   nl: { sunrise: 'zonsopgang', sunset: 'zonsondergang', daily: 'Dagen', hourly: 'Uren' },
-  fr: { sunrise: 'lever du soleil', sunset: 'coucher du soleil', daily: 'Quotidien', hourly: 'Horaire' },
+  fr: { sunrise: 'lever', sunset: 'coucher', daily: 'Quotidien', hourly: 'Horaire' },
 };
 
 class SunWeatherCard extends HTMLElement {
