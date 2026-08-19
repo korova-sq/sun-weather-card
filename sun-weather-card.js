@@ -1,7 +1,7 @@
 /**
  * Sun Weather Card
  * https://github.com/korova-sq/sun-weather-card
- * Version: 1.5.1
+ * Version: 1.6.0
  *
  * A weather card with an animated current-conditions header, a sunrise/sunset
  * arc, and daily/hourly forecasts shown as iOS-style bars or a line graph.
@@ -368,10 +368,23 @@ class SunWeatherCard extends HTMLElement {
           border-top: 1px solid var(--divider-color, #e0e0e0);
         }
         .custom-details {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 8px 8px;
+          padding: 0 0 7px 0;
+        }
+        .custom-details.flow {
           display: flex;
           flex-wrap: wrap;
           gap: 8px 18px;
-          padding: 0 0 7px 0;
+        }
+        /* modalita' griglia (default): taglia valori/nomi lunghi con "..." */
+        .custom-details:not(.flow) .custom-item .cd-row { min-width: 0; }
+        .custom-details:not(.flow) .custom-item .cd-row .d-val {
+          min-width: 0; overflow: hidden; text-overflow: ellipsis;
+        }
+        .custom-details:not(.flow) .custom-item .cd-name {
+          overflow: hidden; text-overflow: ellipsis; max-width: 100%;
         }
         .custom-item {
           min-width: 0; position: relative; text-align: left;
@@ -992,7 +1005,17 @@ class SunWeatherCard extends HTMLElement {
 
   // Formatta un valore per la griglia: le date/ore ISO diventano leggibili,
   // il resto resta invariato.
-  _fmtValue(raw) {
+  _fmtValue(raw, decimals) {
+    // arrotondamento opzionale a N decimali: solo su valori numerici finiti
+    if (decimals != null && decimals !== '') {
+      const d = Number(decimals);
+      const n = typeof raw === 'number' ? raw
+        : (typeof raw === 'string' && raw.trim() !== '' && isFinite(raw)) ? Number(raw)
+        : null;
+      if (n !== null && isFinite(n) && isFinite(d)) {
+        return n.toFixed(Math.max(0, Math.min(20, Math.floor(d))));
+      }
+    }
     if (typeof raw === 'string') {
       // riconosce una data ISO tipo 2026-08-13T04:22:40+00:00
       const isIso = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(raw);
@@ -1152,7 +1175,9 @@ class SunWeatherCard extends HTMLElement {
     // oppure solo al tocco/hover (tooltip).
     const cbox = this.shadowRoot.getElementById('custom-details');
     if (cbox) {
-      const showNames = this._config.show_sensor_names !== false;
+      // toggle "Adattamento testo": ON = flusso a sinistra, OFF (default) = griglia
+      cbox.classList.toggle('flow', this._config.custom_details_flow === true);
+      const showNames = this._config.show_sensor_names === true;
       const customItems = (this._config.custom_details || [])
         .map((c) => {
           if (!c || !c.entity) return '';
@@ -1167,9 +1192,24 @@ class SunWeatherCard extends HTMLElement {
             raw = st.state;
             unit = st.attributes.unit_of_measurement || '';
           }
-          const val = `${this._fmtValue(raw)}${unit ? ' ' + unit : ''}`;
-          const icon = c.icon || st.attributes.icon || 'mdi:gauge';
-          const name = c.name || st.attributes.friendly_name || c.entity;
+          const val = `${this._fmtValue(raw, c.decimals)}${unit ? ' ' + unit : ''}`;
+          // icona davvero opzionale: se il campo e' vuoto non si mostra nulla
+          const iconHtml = c.icon ? `<ha-icon icon="${c.icon}"></ha-icon>` : '';
+          // etichetta sotto il valore: nome opzionale se c'e', altrimenti
+          // friendly name + attributo (reso leggibile), cosi' due voci sulla
+          // stessa entita' con attributi diversi non escono uguali
+          let name;
+          if (c.name) {
+            name = c.name;
+          } else {
+            const friendly = st.attributes.friendly_name || c.entity;
+            if (c.attribute) {
+              const attr = c.attribute.replace(/_/g, ' ').replace(/^./, (ch) => ch.toUpperCase());
+              name = `${friendly} ${attr}`;
+            } else {
+              name = friendly;
+            }
+          }
           const nameHtml = showNames ? `<span class="cd-name">${name}</span>` : '';
           // il tooltip al tocco serve solo quando i nomi NON sono mostrati sotto
           const tipAttrs = showNames ? '' : ` title="${name}" data-name="${name}"`;
@@ -1177,7 +1217,7 @@ class SunWeatherCard extends HTMLElement {
           return `
             <div class="custom-item${tipClass}"${tipAttrs}>
               <div class="cd-row">
-                <ha-icon icon="${icon}"></ha-icon>
+                ${iconHtml}
                 <span class="d-val">${val}</span>
               </div>
               ${nameHtml}
@@ -1930,6 +1970,7 @@ const EDITOR_I18N = {
     custom_sensors: 'Custom sensors',
     custom_sensors_hint: 'Show any sensor entity in the details grid. Pick a sensor and optionally set a name and icon.',
     show_sensor_names: 'Show names under sensors',
+    cs_fit_text: 'Fit to text',
     add_sensor: 'Add sensor',
     cs_entity: 'Sensor entity',
     cs_attribute: 'Attribute (optional)',
@@ -1937,6 +1978,8 @@ const EDITOR_I18N = {
     cs_name: 'Name (optional)',
     cs_name_ph: 'e.g. Reliability',
     cs_icon: 'Icon (optional)',
+    cs_decimals: 'Decimals (optional)',
+    cs_title: 'Sensor',
     cs_remove: 'Remove',
     cs_empty: 'No custom sensors yet.',
     details_empty: 'No details yet. Add attributes below.',
@@ -1990,6 +2033,7 @@ const EDITOR_I18N = {
     custom_sensors: 'Sensori personalizzati',
     custom_sensors_hint: 'Mostra qualsiasi entità sensore nella griglia dei dettagli. Scegli un sensore e, se vuoi, imposta nome e icona.',
     show_sensor_names: 'Mostra i nomi sotto i sensori',
+    cs_fit_text: 'Adattamento testo',
     add_sensor: 'Aggiungi sensore',
     cs_entity: 'Entità sensore',
     cs_attribute: 'Attributo (opzionale)',
@@ -1997,6 +2041,8 @@ const EDITOR_I18N = {
     cs_name: 'Nome (opzionale)',
     cs_name_ph: 'es. Attendibilità',
     cs_icon: 'Icona (opzionale)',
+    cs_decimals: 'Decimali (opzionale)',
+    cs_title: 'Sensore',
     cs_remove: 'Rimuovi',
     cs_empty: 'Nessun sensore personalizzato.',
     details_empty: 'Nessun dettaglio. Aggiungine qui sotto.',
@@ -2050,6 +2096,7 @@ const EDITOR_I18N = {
     custom_sensors: 'Eigene Sensoren',
     custom_sensors_hint: 'Zeige eine beliebige Sensor-Entität im Detailraster. Sensor wählen und optional Name und Symbol setzen.',
     show_sensor_names: 'Namen unter den Sensoren anzeigen',
+    cs_fit_text: 'An Text anpassen',
     add_sensor: 'Sensor hinzufügen',
     cs_entity: 'Sensor-Entität',
     cs_attribute: 'Attribut (optional)',
@@ -2057,6 +2104,8 @@ const EDITOR_I18N = {
     cs_name: 'Name (optional)',
     cs_name_ph: 'z. B. Zuverlässigkeit',
     cs_icon: 'Symbol (optional)',
+    cs_decimals: 'Dezimalstellen (optional)',
+    cs_title: 'Sensor',
     cs_remove: 'Entfernen',
     cs_empty: 'Noch keine eigenen Sensoren.',
     details_empty: 'Noch keine Details. Unten hinzufügen.',
@@ -2112,6 +2161,7 @@ const EDITOR_I18N = {
     custom_sensors: 'Aangepaste sensoren',
     custom_sensors_hint: 'Toon een willekeurige sensor-entiteit in het detailraster. Kies een sensor en stel eventueel naam en icoon in.',
     show_sensor_names: 'Namen onder de sensoren tonen',
+    cs_fit_text: 'Aan tekst aanpassen',
     add_sensor: 'Sensor toevoegen',
     cs_entity: 'Sensor-entiteit',
     cs_attribute: 'Attribuut (optioneel)',
@@ -2119,6 +2169,8 @@ const EDITOR_I18N = {
     cs_name: 'Naam (optioneel)',
     cs_name_ph: 'bijv. Betrouwbaarheid',
     cs_icon: 'Icoon (optioneel)',
+    cs_decimals: 'Decimalen (optioneel)',
+    cs_title: 'Sensor',
     cs_remove: 'Verwijderen',
     cs_empty: 'Nog geen aangepaste sensoren.',
     interaction: 'Interactie',
@@ -2172,6 +2224,7 @@ const EDITOR_I18N = {
     custom_sensors: 'Capteurs personnalisés',
     custom_sensors_hint: "Affichez n'importe quel capteur dans la grille de détails. Choisissez un capteur et, si vous le souhaitez, définissez un nom et une icône.",
     show_sensor_names: 'Afficher les noms sous les capteurs',
+    cs_fit_text: 'Adapter au texte',
     add_sensor: 'Ajouter un capteur',
     cs_entity: 'Entité du capteur',
     cs_attribute: 'Attribut (optionnel)',
@@ -2179,6 +2232,8 @@ const EDITOR_I18N = {
     cs_name: 'Nom (optionnel)',
     cs_name_ph: 'ex. Fiabilité',
     cs_icon: 'Icône (optionnel)',
+    cs_decimals: 'Décimales (optionnel)',
+    cs_title: 'Capteur',
     cs_remove: 'Supprimer',
     cs_empty: 'Aucun capteur personnalisé pour le moment.',
     interaction: 'Interaction',
@@ -2555,9 +2610,8 @@ class SunWeatherCardEditor extends HTMLElement {
         .hint { font-size: 0.78em; color: var(--secondary-text-color); }
 
         .custom-row {
-          border: 1px solid var(--divider-color, #ccc);
-          border-radius: 8px; padding: 10px; margin-bottom: 10px;
-          display: flex; flex-direction: column; gap: 8px;
+          margin-bottom: 8px;
+          display: flex; flex-direction: column; gap: 2px;
         }
         .cs-remove {
           align-self: flex-end;
@@ -2691,13 +2745,21 @@ class SunWeatherCardEditor extends HTMLElement {
     if (tmount && !tmount.dataset.filled) {
       const tform = document.createElement('ha-form');
       tform.hass = this._hass;
-      tform.data = { show_sensor_names: this._config.show_sensor_names !== false };
-      tform.schema = [{ name: 'show_sensor_names', selector: { boolean: {} } }];
-      tform.computeLabel = () => this.t('show_sensor_names');
+      tform.data = {
+        show_sensor_names: this._config.show_sensor_names === true,
+        custom_details_flow: this._config.custom_details_flow === true,
+      };
+      tform.schema = [
+        { name: 'show_sensor_names', selector: { boolean: {} } },
+        { name: 'custom_details_flow', selector: { boolean: {} } },
+      ];
+      tform.computeLabel = (s) =>
+        this.t(s.name === 'custom_details_flow' ? 'cs_fit_text' : 'show_sensor_names');
       tform.addEventListener('value-changed', (e) => {
-        const v = (e.detail.value || {}).show_sensor_names;
-        // ON e' il default: salva solo se OFF
-        this._set('show_sensor_names', v === false ? false : undefined);
+        const v = e.detail.value || {};
+        // entrambi con default OFF: salva solo se ON
+        this._set('show_sensor_names', v.show_sensor_names === true ? true : undefined);
+        this._set('custom_details_flow', v.custom_details_flow === true ? true : undefined);
       });
       tmount.appendChild(tform);
       tmount.dataset.filled = '1';
@@ -2726,43 +2788,75 @@ class SunWeatherCardEditor extends HTMLElement {
         attribute: c.attribute || '',
         name: c.name || '',
         icon: c.icon || '',
+        decimals: c.decimals,
       };
       // il selettore attributo mostra gli attributi dell'entita' scelta;
       // compare solo quando un'entita' e' gia' selezionata
-      const schema = [
+      const inner = [
         { name: 'entity', selector: { entity: {} } },
       ];
       if (c.entity) {
-        schema.push({
+        inner.push({
           name: 'attribute',
           selector: { attribute: { entity_id: c.entity } },
         });
       }
-      schema.push(
+      inner.push(
         { name: 'name', selector: { text: {} } },
         { name: 'icon', selector: { icon: {} } },
+        { name: 'decimals', selector: { number: { min: 0, max: 6, step: 1, mode: 'box' } } },
       );
+      // ogni sensore in un pannello a fisarmonica (expandable nativo di ha-form):
+      // da chiuso occupa una riga, cosi' la lista non diventa lunghissima.
+      // name:'' tiene i valori "piatti", quindi il salvataggio sotto non cambia.
+      // titolo del pannello (nome opzionale, altrimenti entita' + attributo)
+      const title = this._customTitle(c, i);
+      const schema = [{
+        type: 'expandable',
+        name: '',
+        title,
+        icon: c.icon || 'mdi:weather-partly-cloudy',
+        expanded: i === this._openCustomIndex,
+        schema: inner,
+      }];
       form.schema = schema;
       form.computeLabel = (s) => {
         if (s.name === 'entity') return this.t('cs_entity');
         if (s.name === 'attribute') return this.t('cs_attribute');
         if (s.name === 'name') return this.t('cs_name');
         if (s.name === 'icon') return this.t('cs_icon');
+        if (s.name === 'decimals') return this.t('cs_decimals');
         return s.name;
       };
       form.addEventListener('value-changed', (e) => {
         const v = e.detail.value || {};
         const arr = [...(this._config.custom_details || [])];
         const prevEntity = arr[i] && arr[i].entity;
+        const prevAttribute = arr[i] && arr[i].attribute;
+        const prevName = arr[i] && arr[i].name;
         arr[i] = {};
         if (v.entity) arr[i].entity = v.entity;
         if (v.attribute) arr[i].attribute = v.attribute;
         if (v.name) arr[i].name = v.name;
         if (v.icon) arr[i].icon = v.icon;
+        if (v.decimals != null && v.decimals !== '') arr[i].decimals = v.decimals;
         this._config.custom_details = arr;
         this._emit();
-        // se e' cambiata l'entita', ridisegna cosi' il menu attributi si aggiorna
-        if (v.entity !== prevEntity) this._renderCustomEditor();
+        // entita' o attributo (selettori): ricostruisci subito -> aggiorna
+        // menu attributi e titolo del pannello all'istante.
+        if (v.entity !== prevEntity || (v.attribute || '') !== (prevAttribute || '')) {
+          clearTimeout(this._titleTimer);
+          this._openCustomIndex = i;
+          this._renderCustomEditor();
+        } else if ((v.name || '') !== (prevName || '')) {
+          // il nome e' testo libero: non ricostruire a ogni tasto (si perderebbe
+          // il focus). Aspetta una breve pausa e poi aggiorna il titolo.
+          clearTimeout(this._titleTimer);
+          this._titleTimer = setTimeout(() => {
+            this._openCustomIndex = i;
+            this._renderCustomEditor();
+          }, 900);
+        }
       });
 
       const rm = document.createElement('button');
@@ -2777,9 +2871,24 @@ class SunWeatherCardEditor extends HTMLElement {
     });
   }
 
+  // titolo del pannello di un sensore custom: nome opzionale se presente,
+  // altrimenti friendly name dell'entita' + attributo (per distinguere piu'
+  // voci sulla stessa entita'), altrimenti un'etichetta generica numerata
+  _customTitle(c, i) {
+    if (c.name && c.name.trim()) return c.name.trim();
+    if (c.entity) {
+      const st = this._hass && this._hass.states[c.entity];
+      const friendly = (st && st.attributes.friendly_name) || c.entity;
+      return c.attribute ? `${friendly} \u00b7 ${c.attribute}` : friendly;
+    }
+    return `${this.t('cs_title')} ${i + 1}`;
+  }
+
   _addCustom() {
     const arr = [...(this._config.custom_details || [])];
-    arr.push({ entity: '' });
+    // icona di default generica "meteo": compare subito, ma resta cancellabile
+    arr.push({ entity: '', icon: 'mdi:weather-partly-cloudy' });
+    this._openCustomIndex = arr.length - 1; // apri il pannello appena creato
     this._config.custom_details = arr;
     this._emit();
     this._renderCustomEditor();
@@ -2798,6 +2907,7 @@ class SunWeatherCardEditor extends HTMLElement {
   _removeCustom(index) {
     const arr = [...(this._config.custom_details || [])];
     arr.splice(index, 1);
+    this._openCustomIndex = -1; // niente pannello forzato aperto dopo la rimozione
     this._config.custom_details = arr;
     this._emit();
     this._renderCustomEditor();
@@ -2814,7 +2924,7 @@ window.customCards.push({
 });
 
 console.info(
-  '%c SUN-WEATHER-CARD %c 1.5.1 ',
+  '%c SUN-WEATHER-CARD %c 1.6.0 ',
   'color: white; background: #ff7a59; font-weight: 700;',
   'color: #ff7a59; background: #1c1c1c; font-weight: 700;'
 );

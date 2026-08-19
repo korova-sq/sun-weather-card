@@ -29,16 +29,14 @@ Most weather cards on HACS show the forecast as a plain list. This card focuses 
   Grouping by layout keeps the proportions consistent within each row.
   A light/dark pair is shown further down in the "Themes" section.
 -->
-<table align="center">
-<tr>
-<td align="center" width="50%" valign="top"><img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/daily-bars.png" width="100%" /><br><b>📊 Daily forecast – bars</b></td>
-<td align="center" width="50%" valign="top"><img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/hourly-bars.png" width="100%" /><br><b>📊 Hourly forecast – bars</b></td>
-</tr>
-<tr>
-<td align="center" width="50%" valign="top"><img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/daily-graph.png" width="100%" /><br><b>📈 Daily forecast – graph</b></td>
-<td align="center" width="50%" valign="top"><img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/hourly-graph.png" width="100%" /><br><b>📈 Hourly forecast – graph</b></td>
-</tr>
-</table>
+<p align="center">
+  <img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/daily-bars.png" width="300" alt="Bars layout – daily forecast" />
+  <img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/hourly-bars.png" width="300" alt="Bars layout – hourly forecast" />
+</p>
+<p align="center">
+  <img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/daily-graph.png" width="300" alt="Graph layout – daily forecast" />
+  <img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/hourly-graph.png" width="300" alt="Graph layout – hourly forecast" />
+</p>
 
 <br>
 
@@ -51,7 +49,7 @@ Most weather cards on HACS show the forecast as a plain list. This card focuses 
 - 📈 **Two layouts** – classic **bars** (iOS‑style temperature range bars) or a **graph** (smooth temperature line, with max/min lines for daily).
 - 🎨 **Original animated SVG icons** for sun, moon, clouds, rain, snow, fog, wind and lightning. No external assets — animations can be turned off for lower-end devices.
 - 🖼️ **Transparent or image background** – make the card blend into your dashboard, or set a background image with an adjustable light/dark overlay for readability.
-- 🔧 **Custom sensors** – add any entity (or a specific attribute of it, e.g. the sun's elevation or next dawn) to the details, with an optional name and icon. Shown in their own row; names can be displayed under each value or on tap.
+- 🔧 **Custom sensors** – add any entity (or a specific attribute of it, e.g. the sun's elevation or next dawn) to the details, with an optional name, icon and decimal rounding. Shown as a tidy 4‑column grid or a left‑aligned flow; names can be displayed under each value or on tap.
 - 🌍 **Multi‑language** – card content in Italian, English, German, Dutch or French, or follow your Home Assistant system language. The UI editor follows the card language.
 - 👆 **Tap / hold / double‑tap actions** – standard Home Assistant actions (more‑info, navigate, url, perform‑action, toggle).
 - 👁️ **Show only what you need** – time, date and the sun arc can each be turned on or off, and you choose exactly which detail attributes to display.
@@ -63,14 +61,10 @@ Most weather cards on HACS show the forecast as a plain list. This card focuses 
 
 The card automatically follows your Home Assistant theme — light or dark.
 
-<br>
-
-<table align="center">
-<tr>
-<td align="center" width="50%" valign="top"><img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/theme-light.png" width="100%" /><br><b>☀️ Light theme</b></td>
-<td align="center" width="50%" valign="top"><img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/theme-dark.png" width="100%" /><br><b>🌙 Dark theme</b></td>
-</tr>
-</table>
+<p align="center">
+  <img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/theme-light.png" width="300" alt="Light theme" />
+  <img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/theme-dark.png" width="300" alt="Dark theme" />
+</p>
 
 ---
 
@@ -136,7 +130,8 @@ All options can be set from the visual editor or in YAML.
 | `show_forecast_toggle` | boolean | `false` | Show an in‑card Daily/Hourly toggle. |
 | `details` | list | *(none)* | Attributes to show below the arc (see below). |
 | `custom_details` | list | *(none)* | Extra entities to show in the details (see below). |
-| `show_sensor_names` | boolean | `true` | Show the custom sensor name under each value. When off, the name appears on tap. |
+| `show_sensor_names` | boolean | `false` | Show the custom sensor name under each value. When off (default), the name appears on tap. |
+| `custom_details_flow` | boolean | `false` | Custom sensors layout. Off (default) = a tidy 4‑column grid; long values are truncated with `…`. On = left‑aligned flow where each cell fits its content — good for long dates or names. |
 | `tap_action` | action | `more-info` | Standard HA action. |
 | `hold_action` | action | – | Standard HA action. |
 | `double_tap_action` | action | – | Standard HA action. |
@@ -149,7 +144,7 @@ Add any of these to the `details` list, in the order you want them shown. An ite
 
 ### Custom sensors
 
-Use `custom_details` to show any entity in the details grid — not just the weather entity's attributes. You can show the entity's state, or a specific attribute of it (for example the sun's `elevation` or `next_dawn`). Each item takes an `entity` and, optionally, an `attribute`, a `name` and an `icon`:
+Use `custom_details` to show any entity in the details grid — not just the weather entity's attributes. You can show the entity's state, or a specific attribute of it (for example the sun's `elevation` or `next_dawn`). Each item takes an `entity` and, optionally, an `attribute`, a `name`, an `icon` and `decimals`:
 
 ```yaml
 custom_details:
@@ -158,9 +153,12 @@ custom_details:
     attribute: elevation
     name: Sun elevation
     icon: mdi:weather-sunny
+    decimals: 1
 ```
 
-Date/time attributes (like `next_dawn`) are formatted automatically. Names are shown under each value by default; set `show_sensor_names: false` to show them on tap instead.
+Date/time attributes (like `next_dawn`) are formatted automatically. `decimals` rounds a numeric value to the given number of decimal places — handy for attributes, which Home Assistant can't round on their own. Leave `icon` empty for no icon; when it's omitted a new item starts with a generic weather icon you can change or clear.
+
+By default the custom sensors are shown in a 4‑column grid; set `custom_details_flow: true` for a left‑aligned layout where each cell fits its content. When no `name` is given, the label falls back to the entity name plus the attribute, so two items on the same entity stay distinct. Sensor names appear on tap by default; set `show_sensor_names: true` to show them under each value instead.
 
 ---
 

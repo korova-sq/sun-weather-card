@@ -10,7 +10,8 @@ forecasts as iOS‑style bars or a smooth line graph. Configurable from the UI.
 - Pick which detail attributes to show (they appear only if your integration
   provides them)
 - Add custom sensors — any entity or one of its attributes (e.g. the sun's
-  elevation or next dawn) — with an optional name and icon
+  elevation or next dawn) — with an optional name, icon and decimal rounding,
+  shown as a grid or a left‑aligned flow
 - Italian, English, German, Dutch or French / system language
 - Tap, hold and double‑tap actions
 - Full visual editor
