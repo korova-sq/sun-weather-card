@@ -29,14 +29,16 @@ Most weather cards on HACS show the forecast as a plain list. This card focuses 
   Grouping by layout keeps the proportions consistent within each row.
   A light/dark pair is shown further down in the "Themes" section.
 -->
-<p align="center">
-  <img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/daily-bars.png" width="300" alt="Bars layout – daily forecast" />
-  <img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/hourly-bars.png" width="300" alt="Bars layout – hourly forecast" />
-</p>
-<p align="center">
-  <img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/daily-graph.png" width="300" alt="Graph layout – daily forecast" />
-  <img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/hourly-graph.png" width="300" alt="Graph layout – hourly forecast" />
-</p>
+<table align="center">
+<tr>
+<td align="center" width="50%" valign="top"><img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/daily-bars.png" width="100%" /><br><b>📊 Daily forecast – bars</b></td>
+<td align="center" width="50%" valign="top"><img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/hourly-bars.png" width="100%" /><br><b>📊 Hourly forecast – bars</b></td>
+</tr>
+<tr>
+<td align="center" width="50%" valign="top"><img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/daily-graph.png" width="100%" /><br><b>📈 Daily forecast – graph</b></td>
+<td align="center" width="50%" valign="top"><img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/hourly-graph.png" width="100%" /><br><b>📈 Hourly forecast – graph</b></td>
+</tr>
+</table>
 
 <br>
 
@@ -61,10 +63,12 @@ Most weather cards on HACS show the forecast as a plain list. This card focuses 
 
 The card automatically follows your Home Assistant theme — light or dark.
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/theme-light.png" width="300" alt="Light theme" />
-  <img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/theme-dark.png" width="300" alt="Dark theme" />
-</p>
+<table align="center">
+<tr>
+<td align="center" width="50%" valign="top"><img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/theme-light.png" width="100%" /><br><b>☀️ Light theme</b></td>
+<td align="center" width="50%" valign="top"><img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/theme-dark.png" width="100%" /><br><b>🌙 Dark theme</b></td>
+</tr>
+</table>
 
 ---
 
