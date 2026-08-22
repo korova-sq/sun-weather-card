@@ -1,7 +1,7 @@
 /**
  * Sun Weather Card
  * https://github.com/korova-sq/sun-weather-card
- * Version: 1.6.0
+ * Version: 1.6.1
  *
  * A weather card with an animated current-conditions header, a sunrise/sunset
  * arc, and daily/hourly forecasts shown as iOS-style bars or a line graph.
@@ -885,6 +885,31 @@ class SunWeatherCard extends HTMLElement {
     return h < 6 || h >= 20;
   }
 
+  // È notte all'orario 'date'? Serve a scegliere l'icona giorno/notte di ogni
+  // ora della previsione. Confronta l'ora-del-giorno con alba/tramonto della
+  // posizione (dal sun entity); ripiego 6-20 se il sun entity non c'è.
+  _isNightAt(date) {
+    const sunState = this._hass.states[this._config.sun_entity];
+    if (sunState && sunState.attributes.next_rising && sunState.attributes.next_setting) {
+      const { sunrise, sunset } = this._getTodaySunTimes(sunState, new Date());
+      const mins = (d) => d.getHours() * 60 + d.getMinutes();
+      const m = mins(date);
+      return m < mins(sunrise) || m >= mins(sunset);
+    }
+    const h = date.getHours();
+    return h < 6 || h >= 20;
+  }
+
+  // Converte una condizione nella sua variante notturna, ma SOLO di notte e SOLO
+  // per le condizioni che mostrano il sole (sereno / parz. nuvoloso). Le altre e
+  // quelle già notturne restano invariate.
+  _nightCondition(condition, datetime) {
+    if (!this._isNightAt(new Date(datetime))) return condition;
+    if (condition === 'sunny') return 'clear-night';
+    if (condition === 'partlycloudy') return 'partlycloudy-night';
+    return condition;
+  }
+
   // Risolve la lingua scelta in un locale effettivo.
   // 'it' -> it-IT, 'en' -> en-GB, 'de' -> de-DE, 'system' -> lingua di HA/browser.
   _locale() {
@@ -1023,12 +1048,15 @@ class SunWeatherCard extends HTMLElement {
         const d = new Date(raw);
         if (!isNaN(d)) {
           const loc = this._locale() || undefined;
+          // rispetta il time_format della card (24/12) come il resto della card,
+          // invece di lasciare il 12/24h al default del locale
+          const hour12 = this._config.time_format === '12';
           const now = new Date();
           const sameDay = d.toDateString() === now.toDateString();
           // stesso giorno -> solo ora (es. 04:22); altrimenti giorno+ora breve
           return sameDay
-            ? d.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' })
-            : d.toLocaleString(loc, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+            ? d.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit', hour12 })
+            : d.toLocaleString(loc, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12 });
         }
       }
     }
@@ -1477,7 +1505,7 @@ class SunWeatherCard extends HTMLElement {
         const color = this._tempToColor(t);
 
         this._iconUid += 1;
-        const icon = this._icon(h.condition, this._iconUid, 28);
+        const icon = this._icon(this._nightCondition(h.condition, h.datetime), this._iconUid, 28);
 
         return `
           <div class="forecast-row hourly">
@@ -1611,7 +1639,8 @@ class SunWeatherCard extends HTMLElement {
 
     const icons = days.map((d, i) => {
       this._iconUid += 1;
-      const svg = this._icon(d.condition, this._iconUid, iconSize);
+      const cond = hourly ? this._nightCondition(d.condition, d.datetime) : d.condition;
+      const svg = this._icon(cond, this._iconUid, iconSize);
       return `<g transform="translate(${x(i) - iconSize / 2}, ${yIcon})">${svg}</g>`;
     }).join('');
 
@@ -1693,6 +1722,7 @@ class SunWeatherCard extends HTMLElement {
       sunny: () => this._iconSunny(uid, size),
       'clear-night': () => this._iconClearNight(uid, size),
       partlycloudy: () => this._iconPartlyCloudy(uid, size),
+      'partlycloudy-night': () => this._iconPartlyCloudyNight(uid, size),
       cloudy: () => this._iconCloudy(uid, size),
       fog: () => this._iconFog(uid, size),
       windy: () => this._iconWindy(uid, size),
@@ -1770,6 +1800,20 @@ class SunWeatherCard extends HTMLElement {
             <animateTransform attributeName="transform" type="rotate" from="0 8 8" to="360 8 8" dur="28s" repeatCount="indefinite"/>
           </g>
           <circle cx="8" cy="8" r="3.4" fill="#ffb703"/>
+        </g>
+        <g>
+          <path d="${this._cloudPath()}" fill="#b8c2d0" transform="translate(3,4)"/>
+          <animateTransform attributeName="transform" type="translate" values="-1 0;1 0;-1 0" dur="6s" repeatCount="indefinite"/>
+        </g>
+      </svg>
+    `;
+  }
+
+  _iconPartlyCloudyNight(uid, size) {
+    return `
+      <svg viewBox="0 0 24 24" width="${size}" height="${size}">
+        <g>
+          <path d="M15 3a9 9 0 1 0 6 15.9A9 9 0 0 1 15 3z" fill="#a9b6d6" transform="translate(2.6 3.4) scale(0.4)"/>
         </g>
         <g>
           <path d="${this._cloudPath()}" fill="#b8c2d0" transform="translate(3,4)"/>
@@ -2924,7 +2968,7 @@ window.customCards.push({
 });
 
 console.info(
-  '%c SUN-WEATHER-CARD %c 1.6.0 ',
+  '%c SUN-WEATHER-CARD %c 1.6.1 ',
   'color: white; background: #ff7a59; font-weight: 700;',
   'color: #ff7a59; background: #1c1c1c; font-weight: 700;'
 );
