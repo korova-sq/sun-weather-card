@@ -1,7 +1,7 @@
 /**
  * Sun Weather Card
  * https://github.com/korova-sq/sun-weather-card
- * Version: 1.6.1
+ * Version: 1.7.0
  *
  * A weather card with an animated current-conditions header, a sunrise/sunset
  * arc, and daily/hourly forecasts shown as iOS-style bars or a line graph.
@@ -144,6 +144,9 @@ class SunWeatherCard extends HTMLElement {
       // layout previsioni giornaliere: 'bars' (righe con barre) o 'graph'
       // (grafico orizzontale a due linee con icone sopra e mm sotto)
       forecast_layout: 'bars',
+      // nel layout 'graph': false = linee a colore fisso (arancio/azzurro);
+      // true = linee colorate in base alla temperatura come le barre
+      graph_color_by_temp: false,
       // quante righe di previsione restano sempre visibili; le altre
       // diventano scrollabili verticalmente. null = mostra tutte senza scroll.
       visible_rows: null,
@@ -481,7 +484,7 @@ class SunWeatherCard extends HTMLElement {
         .forecast-scroll {
           display: flex;
           flex-direction: column;
-          gap: 8px;
+          gap: 6px;
           padding-right: 6px;
           scrollbar-gutter: stable;
           overflow-y: auto;
@@ -523,11 +526,17 @@ class SunWeatherCard extends HTMLElement {
           grid-template-columns: 44px 30px 1fr 34px;
           gap: 10px;
         }
+        /* quando almeno un giorno ha pioggia, riserva una colonna destra fissa
+           su tutte le righe: barre di larghezza uniforme e mm sotto la massima */
+        .forecast-row.has-precip {
+          grid-template-columns: 40px 28px 30px 1fr 50px;
+        }
         .temp-group {
           display: flex;
-          align-items: center;
-          justify-content: flex-end;
-          gap: 6px;
+          flex-direction: column;
+          align-items: flex-end;
+          justify-content: center;
+          gap: 0;
           padding-right: 5px;
         }
         .temp-group .temp-max {
@@ -539,6 +548,8 @@ class SunWeatherCard extends HTMLElement {
           color: #4d9de0;
           text-align: right;
           white-space: nowrap;
+          line-height: 1;
+          margin-top: -1px;
         }
         .forecast-row .label {
           color: var(--secondary-text-color);
@@ -1422,6 +1433,7 @@ class SunWeatherCard extends HTMLElement {
     const currentTemp = wState?.attributes?.temperature;
     const precipUnit = wState?.attributes?.precipitation_unit || 'mm';
     const showPrecip = this._config.show_forecast_precipitation;
+    const anyPrecip = showPrecip && days.some((d) => d.precipitation != null && d.precipitation > 0);
     const todayStr = new Date().toDateString();
 
     list.innerHTML = days
@@ -1449,14 +1461,16 @@ class SunWeatherCard extends HTMLElement {
         this._iconUid += 1;
         const icon = this._icon(d.condition, this._iconUid, 28);
 
-        // mm di pioggia previsti per il giorno (se presenti e > 0)
+        // mm di pioggia previsti per il giorno (se presenti e > 0); sui giorni
+        // senza pioggia riservo comunque la riga (vuota) quando qualche giorno
+        // ce l'ha, cosi' le massime restano allineate
         const hasPrecip = showPrecip && d.precipitation != null && d.precipitation > 0;
         const precipHtml = hasPrecip
           ? `<span class="f-precip">${d.precipitation} ${precipUnit}</span>`
-          : '';
+          : (anyPrecip ? '<span class="f-precip">&nbsp;</span>' : '');
 
         return `
-          <div class="forecast-row">
+          <div class="forecast-row${anyPrecip ? ' has-precip' : ''}">
             <div class="label">${label}</div>
             <div class="icon-wrap">${icon}</div>
             <div class="temp-min">${Math.round(low)}\u00b0</div>
@@ -1660,10 +1674,33 @@ class SunWeatherCard extends HTMLElement {
       return `<text class="g-precip" x="${x(i)}" y="${h - 6}" text-anchor="middle">${d.precipitation} ${precipUnit}</text>`;
     }).join('') : '';
 
-    const dotsMax = ptsMax.map((p) => `<circle class="g-dot-max" cx="${p[0]}" cy="${p[1]}" r="3" />`).join('');
-    const dotsMin = hourly ? '' : ptsMin.map((p) => `<circle class="g-dot-min" cx="${p[0]}" cy="${p[1]}" r="3" />`).join('');
+    const colorByTemp = this._config.graph_color_by_temp === true;
+    const gid = (this._iconUid += 1);
+    const tempsMax = days.map((d) => d.temperature);
+    const tempsMin = days.map((d) => (d.templow != null ? d.templow : d.temperature));
+    const stopsFor = (pts, temps) => pts.map((p, i) => {
+      const off = Math.max(0, Math.min(100, (p[0] / w) * 100));
+      return `<stop offset="${off.toFixed(1)}%" stop-color="${this._tempToColor(temps[i])}"/>`;
+    }).join('');
+    const gradMax = colorByTemp
+      ? `<linearGradient id="gLineMax${gid}" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="${w}" y2="0">${stopsFor(ptsMax, tempsMax)}</linearGradient>`
+      : '';
+    const gradMin = (colorByTemp && !hourly)
+      ? `<linearGradient id="gLineMin${gid}" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="${w}" y2="0">${stopsFor(ptsMin, tempsMin)}</linearGradient>`
+      : '';
+    const maxStroke = colorByTemp ? ` style="stroke:url(#gLineMax${gid})"` : '';
+    const minStroke = colorByTemp ? ` style="stroke:url(#gLineMin${gid})"` : '';
 
-    const lineMinSvg = hourly ? '' : `<path class="g-line-min" d="${lineMin}" />`;
+    const dotsMax = ptsMax.map((p, i) => {
+      const s = colorByTemp ? ` style="stroke:${this._tempToColor(tempsMax[i])}"` : '';
+      return `<circle class="g-dot-max" cx="${p[0]}" cy="${p[1]}" r="3"${s} />`;
+    }).join('');
+    const dotsMin = hourly ? '' : ptsMin.map((p, i) => {
+      const s = colorByTemp ? ` style="stroke:${this._tempToColor(tempsMin[i])}"` : '';
+      return `<circle class="g-dot-min" cx="${p[0]}" cy="${p[1]}" r="3"${s} />`;
+    }).join('');
+
+    const lineMinSvg = hourly ? '' : `<path class="g-line-min" d="${lineMin}"${minStroke} />`;
 
     list.innerHTML = `
       <svg class="fc-graph" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" preserveAspectRatio="xMinYMid meet">
@@ -1672,11 +1709,12 @@ class SunWeatherCard extends HTMLElement {
             <stop offset="0%" stop-color="#ff7a59" stop-opacity="0.28"/>
             <stop offset="100%" stop-color="#ff7a59" stop-opacity="0"/>
           </linearGradient>
+          ${gradMax}${gradMin}
         </defs>
         ${dayLabels}
         ${icons}
         <path class="g-area-max" d="${areaMax}" />
-        <path class="g-line-max" d="${lineMax}" />
+        <path class="g-line-max" d="${lineMax}"${maxStroke} />
         ${lineMinSvg}
         ${dotsMax}${dotsMin}
         ${maxLabels}${minLabels}
@@ -1813,7 +1851,7 @@ class SunWeatherCard extends HTMLElement {
     return `
       <svg viewBox="0 0 24 24" width="${size}" height="${size}">
         <g>
-          <path d="M15 3a9 9 0 1 0 6 15.9A9 9 0 0 1 15 3z" fill="#a9b6d6" transform="translate(2.6 3.4) scale(0.4)"/>
+          <path d="M15 3a9 9 0 1 0 6 15.9A9 9 0 0 1 15 3z" fill="#a9b6d6" transform="translate(1.3 1.4) scale(0.5)"/>
         </g>
         <g>
           <path d="${this._cloudPath()}" fill="#b8c2d0" transform="translate(3,4)"/>
@@ -2004,6 +2042,7 @@ const EDITOR_I18N = {
     ft_daily: 'Daily', ft_hourly: 'Hourly',
     daily_layout: 'Daily layout',
     dl_bars: 'Bars', dl_graph: 'Graph (lines)',
+    graph_color_by_temp: 'Colour graph lines by temperature',
     days_to_load: 'Days to load',
     hours_to_load: 'Hours to load',
     visible_rows: 'Visible days (empty = all)',
@@ -2067,6 +2106,7 @@ const EDITOR_I18N = {
     ft_daily: 'Giornaliera', ft_hourly: 'Oraria',
     daily_layout: 'Layout giornaliero',
     dl_bars: 'Barre', dl_graph: 'Grafico (linee)',
+    graph_color_by_temp: 'Colora le linee del grafico per temperatura',
     days_to_load: 'Giorni da caricare',
     hours_to_load: 'Ore da caricare',
     visible_rows: 'Giorni visibili (vuoto = tutte)',
@@ -2130,6 +2170,7 @@ const EDITOR_I18N = {
     ft_daily: 'Täglich', ft_hourly: 'Stündlich',
     daily_layout: 'Tages-Layout',
     dl_bars: 'Balken', dl_graph: 'Diagramm (Linien)',
+    graph_color_by_temp: 'Diagrammlinien nach Temperatur einfärben',
     days_to_load: 'Zu ladende Tage',
     hours_to_load: 'Zu ladende Stunden',
     visible_rows: 'Sichtbare Tage (leer = alle)',
@@ -2193,6 +2234,7 @@ const EDITOR_I18N = {
     ft_daily: 'Dagelijks', ft_hourly: 'Uurlijks',
     daily_layout: 'Dagelijkse layout',
     dl_bars: 'Balken', dl_graph: 'Grafiek (lijnen)',
+    graph_color_by_temp: 'Grafieklijnen kleuren op temperatuur',
     days_to_load: 'Te laden dagen',
     hours_to_load: 'Te laden uren',
     visible_rows: 'Zichtbare dagen (leeg = alle)',
@@ -2256,6 +2298,7 @@ const EDITOR_I18N = {
     ft_daily: 'Quotidienne', ft_hourly: 'Horaire',
     daily_layout: 'Disposition quotidienne',
     dl_bars: 'Barres', dl_graph: 'Graphique (lignes)',
+    graph_color_by_temp: 'Colorer les lignes du graphique selon la température',
     days_to_load: 'Jours à charger',
     hours_to_load: 'Heures à charger',
     visible_rows: 'Jours visibles (vide = tous)',
@@ -2476,6 +2519,7 @@ class SunWeatherCardEditor extends HTMLElement {
     form.data = {
       forecast_type: c.forecast_type || 'daily',
       forecast_layout: c.forecast_layout || 'bars',
+      graph_color_by_temp: c.graph_color_by_temp === true,
       forecast_days: c.forecast_days ?? 7,
       forecast_hours: c.forecast_hours ?? 24,
       visible_rows: c.visible_rows ?? null,
@@ -2493,6 +2537,7 @@ class SunWeatherCardEditor extends HTMLElement {
         { value: 'bars', label: this.t('dl_bars') },
         { value: 'graph', label: this.t('dl_graph') },
       ]) },
+      { name: 'graph_color_by_temp', selector: { boolean: {} } },
       { name: 'visible_rows', selector: num(1, 15) },
       { name: 'forecast_days', selector: num(1, 15) },
       { name: 'forecast_hours', selector: num(1, 48) },
@@ -2501,6 +2546,7 @@ class SunWeatherCardEditor extends HTMLElement {
     ];
     const labels = {
       forecast_type: this.t('forecast_type'), forecast_layout: this.t('daily_layout'),
+      graph_color_by_temp: this.t('graph_color_by_temp'),
       forecast_days: this.t('days_to_load'), forecast_hours: this.t('hours_to_load'),
       visible_rows: this.t('visible_rows'),
       show_forecast_precipitation: this.t('show_rain'),
@@ -2511,6 +2557,8 @@ class SunWeatherCardEditor extends HTMLElement {
       const v = e.detail.value || {};
       this._set('forecast_type', v.forecast_type);
       this._set('forecast_layout', v.forecast_layout);
+      // graph_color_by_temp e' spento di default: salva solo se true
+      this._set('graph_color_by_temp', v.graph_color_by_temp === true ? true : undefined);
       this._set('forecast_days', v.forecast_days);
       this._set('forecast_hours', v.forecast_hours);
       // visible_rows: vuoto/null = mostra tutte
@@ -2968,7 +3016,7 @@ window.customCards.push({
 });
 
 console.info(
-  '%c SUN-WEATHER-CARD %c 1.6.1 ',
+  '%c SUN-WEATHER-CARD %c 1.7.0 ',
   'color: white; background: #ff7a59; font-weight: 700;',
   'color: #ff7a59; background: #1c1c1c; font-weight: 700;'
 );
