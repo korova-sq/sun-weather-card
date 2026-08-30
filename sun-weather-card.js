@@ -1,7 +1,22 @@
 /**
  * Sun Weather Card
  * https://github.com/korova-sq/sun-weather-card
- * Version: 1.7.0
+ * Version: 1.7.0 (patched: sticky today's-low, see "_dayLow")
+ *
+ * PATCH NOTES:
+ * Some weather integrations (BOM/Bureau of Meteorology in particular) drop
+ * today's overnight low once the day's max has been reached, rolling over
+ * to a "rest of today" forecast that can report a higher low than what
+ * actually happened overnight. This patch adds `_dayLow()`, which sticks to
+ * the lowest templow seen so far today (cached in localStorage, keyed by
+ * entity + date) so the header, bar chart, and line graph all keep showing
+ * the real overnight low instead of a later, higher value. Future days are
+ * untouched, since their low hasn't happened yet.
+ *
+ * Also folded in from the 1.6.1-sticky-low patch: render-signature caching
+ * (skip rebuilding icons/DOM on unrelated hass updates), a ResizeObserver-
+ * cached graph width, an independent clock tick, and a 41-stop discrete
+ * temperature->hex color table used consistently for bars and graph lines.
  *
  * A weather card with an animated current-conditions header, a sunrise/sunset
  * arc, and daily/hourly forecasts shown as iOS-style bars or a line graph.
@@ -175,10 +190,46 @@ class SunWeatherCard extends HTMLElement {
     this._dailyFetchedAt = 0;
     this._hourlyFetchedAt = 0;
     this._iconUid = 0;
+    // firme di rendering: servono a evitare di ricostruire icone/SVG animati
+    // quando hass si aggiorna per sensori che non c'entrano nulla con questa
+    // card, cosa che altrimenti riavvia da zero le animazioni (rotazione del
+    // sole, nuvole che scorrono, stelle che lampeggiano, ecc.)
+    this._curIconSig = null;
+    this._graphSig = null;
+    this._barsSig = null;
+    this._hourlySig = null;
+    this._detailsHtml = null;
+    this._customDetailsHtml = null;
+    this._graphColWidth = null;
 
     if (!this.shadowRoot) {
       this.attachShadow({ mode: 'open' });
       this._buildStaticDOM();
+    }
+  }
+
+  connectedCallback() {
+    if (this._clockTimer) return;
+    this._clockTimer = setInterval(() => {
+      if (!this._config || this._config.show_time === false) return;
+      const timeEl = this.shadowRoot.getElementById('time');
+      if (!timeEl) return;
+      const timeFmt = new Intl.DateTimeFormat(this._locale(), {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: this._config.time_format === '12',
+      });
+      timeEl.textContent = timeFmt.format(new Date());
+    }, 1000);
+  }
+
+  disconnectedCallback() {
+    clearInterval(this._clockTimer);
+    this._clockTimer = null;
+    if (this._graphResizeObs) {
+      this._graphResizeObs.disconnect();
+      this._graphResizeObs = null;
     }
   }
 
@@ -187,7 +238,7 @@ class SunWeatherCard extends HTMLElement {
       <style>
         :host { display: block; }
         ha-card {
-          padding: 16px 18px 18px;
+          padding: 8px 18px 8px;
           font-family: var(--paper-font-body1_-_font-family, inherit);
           position: relative;
         }
@@ -509,7 +560,11 @@ class SunWeatherCard extends HTMLElement {
         }
         .fc-graph .g-tmax { font-size: 12px; font-weight: 700; fill: var(--primary-text-color); }
         .fc-graph .g-tmin { font-size: 12px; fill: var(--secondary-text-color); }
-        .fc-graph .g-precip { font-size: 10px; font-weight: 600; fill: #4d9de0; }
+        .fc-graph .g-precip { font-size: 10px; font-weight: 600; fill: var(--swc-precip-bar-color, #4d9de0); }
+        .fc-graph .g-bar-precip {
+          fill: var(--swc-precip-bar-color, #4d9de0);
+          opacity: var(--swc-precip-bar-opacity, 0.55);
+        }
         .fc-graph .g-area-max { fill: url(#gMaxArea); stroke: none; }
         .fc-graph .g-line-max { fill: none; stroke: #ff7a59; stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }
         .fc-graph .g-line-min { fill: none; stroke: #35b5c4; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
@@ -645,6 +700,26 @@ class SunWeatherCard extends HTMLElement {
         scrollEl.scrollLeft += delta;
         ev.preventDefault();
       }, { passive: false });
+
+      // larghezza del contenitore per il grafico previsioni: osservata qui
+      // invece di leggere clientWidth/getComputedStyle a ogni tick di hass
+      // (una lettura del genere forza un reflow sincrono anche quando il
+      // grafico poi risulta invariato e non va ricostruito)
+      if (typeof ResizeObserver !== 'undefined') {
+        this._graphResizeObs = new ResizeObserver((entries) => {
+          for (const entry of entries) {
+            const cw = entry.contentRect.width;
+            if (cw && cw !== this._graphColWidth) {
+              this._graphColWidth = cw;
+              this._graphSig = null; // forza il ricalcolo alla prossima render utile
+              if (this._config && this._config.forecast_layout === 'graph') {
+                this._renderForecast();
+              }
+            }
+          }
+        });
+        this._graphResizeObs.observe(scrollEl);
+      }
     }
 
     // gestione toggle Giorni/Ore
@@ -777,13 +852,12 @@ class SunWeatherCard extends HTMLElement {
     const timeFmt = new Intl.DateTimeFormat(this._locale(), {
       hour: '2-digit',
       minute: '2-digit',
+      second: '2-digit',
       hour12: cfg.time_format === '12',
     });
-    const dateFmt = new Intl.DateTimeFormat(this._locale(), {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-    });
+    const weekdayFmt = new Intl.DateTimeFormat(this._locale(), { weekday: 'long' });
+    const dayFmt = new Intl.DateTimeFormat(this._locale(), { day: 'numeric' });
+    const monthFmt = new Intl.DateTimeFormat(this._locale(), { month: 'long' });
 
     const timeEl = this.shadowRoot.getElementById('time');
     const dateEl = this.shadowRoot.getElementById('date');
@@ -870,7 +944,7 @@ class SunWeatherCard extends HTMLElement {
     }
 
     timeEl.textContent = timeFmt.format(now);
-    dateEl.textContent = dateFmt.format(now);
+    dateEl.textContent = `${weekdayFmt.format(now)}, ${dayFmt.format(now)} ${monthFmt.format(now)}`;
 
     // mostra/nascondi ora, data, arco
     const showTime = cfg.show_time !== false;
@@ -1020,19 +1094,33 @@ class SunWeatherCard extends HTMLElement {
         this._daily[0];
       if (todayEntry) {
         const hi = todayEntry.temperature;
-        const lo = todayEntry.templow;
+        const lo = this._dayLow(todayEntry);
         if (hi != null && lo != null) {
           hilo = `${numFmt.format(hi)}${unit} / ${numFmt.format(lo)}${unit}`;
         }
       }
     }
 
-    this._iconUid += 1;
-    this.shadowRoot.getElementById('cur-icon').innerHTML =
-      this._icon(condition, this._iconUid, 68);
+    // evita di ricostruire l'icona (e riavviare la sua animazione SMIL) se la
+    // condizione mostrata non e' davvero cambiata: hass puo' aggiornarsi
+    // molte volte al minuto per sensori che non c'entrano nulla con questa card
+    const animatedFlag = this._config.animated_icons !== false;
+    const curIconSig = `${condition}|${animatedFlag}`;
+    if (this._curIconSig !== curIconSig) {
+      this._curIconSig = curIconSig;
+      this._iconUid += 1;
+      this.shadowRoot.getElementById('cur-icon').innerHTML =
+        this._icon(condition, this._iconUid, 68);
+    }
     const descEl = this.shadowRoot.getElementById('cur-desc');
-    descEl.textContent = this._conditionLabel(wState.state);
-    this._fitConditionText(descEl);
+    // _fitConditionText forza una lettura sincrona di layout (scrollWidth/
+    // clientWidth, fino a 20 iterazioni): va eseguita solo se il testo e'
+    // davvero cambiato, non a ogni tick di hass
+    const newDesc = this._conditionLabel(wState.state);
+    if (descEl.textContent !== newDesc) {
+      descEl.textContent = newDesc;
+      this._fitConditionText(descEl);
+    }
     this.shadowRoot.getElementById('cur-location').textContent = location;
     this.shadowRoot.getElementById('cur-temp').textContent =
       temp != null ? `${numFmt.format(temp)}${unit}` : '--';
@@ -1207,7 +1295,15 @@ class SunWeatherCard extends HTMLElement {
           </div>`;
       });
 
-    box.innerHTML = stdItems.join('');
+    // evita di ricostruire la griglia (e riavviare qualunque transizione) se
+    // il contenuto risultante e' identico all'ultima volta: hass puo'
+    // aggiornarsi molte volte al minuto per sensori che non c'entrano nulla
+    // con questi dettagli
+    const newDetailsHtml = stdItems.join('');
+    if (this._detailsHtml !== newDetailsHtml) {
+      this._detailsHtml = newDetailsHtml;
+      box.innerHTML = newDetailsHtml;
+    }
 
     // sensori personalizzati: griglia separata a 2 colonne sotto gli standard.
     // Il nome puo' essere mostrato sotto il valore (show_sensor_names, default ON)
@@ -1262,9 +1358,13 @@ class SunWeatherCard extends HTMLElement {
               ${nameHtml}
             </div>`;
         });
-      cbox.innerHTML = customItems.join('');
+      const newCustomHtml = customItems.join('');
       cbox.style.display = customItems.some((x) => x) ? '' : 'none';
-      this._wireDetailTips(cbox);
+      if (this._customDetailsHtml !== newCustomHtml) {
+        this._customDetailsHtml = newCustomHtml;
+        cbox.innerHTML = newCustomHtml;
+        this._wireDetailTips(cbox);
+      }
     }
   }
 
@@ -1354,6 +1454,73 @@ class SunWeatherCard extends HTMLElement {
     `;
   }
 
+  // Chiave del giorno corrente, in ora locale (YYYY-M-D)
+  _todayKey() {
+    const d = new Date();
+    return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+  }
+
+  // Restituisce la minima "stabile" di una voce di previsione giornaliera.
+  // Per il giorno di OGGI: una volta vista una minima piu' bassa, viene
+  // ricordata (in localStorage) anche se l'integrazione meteo in seguito
+  // riporta un valore piu' alto per il resto della giornata. Questo risolve
+  // un comportamento noto del BOM (Bureau of Meteorology): dopo che la
+  // massima del giorno e' stata raggiunta, il loro feed passa a una
+  // previsione "per il resto di oggi" che non contiene piu' la minima
+  // notturna gia' avvenuta, quindi templow puo' salire (es. allinearsi alla
+  // temperatura attuale) invece di restare la minima reale della notte.
+  // I giorni futuri non sono toccati: la loro minima non e' ancora accaduta
+  // e deve poter aggiornarsi liberamente quando la previsione si affina.
+  _dayLow(entry) {
+    if (!entry) return null;
+    const rawLow = entry.templow != null ? entry.templow : entry.temperature;
+    if (rawLow == null) return null;
+
+    const entryDate = new Date(entry.datetime);
+    if (isNaN(entryDate)) return rawLow;
+    const entryKey = `${entryDate.getFullYear()}-${entryDate.getMonth() + 1}-${entryDate.getDate()}`;
+    const todayKey = this._todayKey();
+    if (entryKey !== todayKey) return rawLow;
+
+    const storageKey = `swc-low:${this._config.entity}:${todayKey}`;
+    let stored = null;
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw != null) stored = parseFloat(raw);
+    } catch (e) {
+      // localStorage non disponibile (es. iframe sandboxato): usa il valore grezzo
+      return rawLow;
+    }
+
+    let finalLow = rawLow;
+    if (stored != null && isFinite(stored)) finalLow = Math.min(stored, rawLow);
+
+    try {
+      localStorage.setItem(storageKey, String(finalLow));
+      this._cleanupOldLows(todayKey);
+    } catch (e) {
+      // quota piena o storage non disponibile: continua comunque con finalLow
+    }
+
+    return finalLow;
+  }
+
+  // rimuove le chiavi "sticky low" di giorni passati, cosi' localStorage non
+  // accumula voci all'infinito (una per entita' per giorno)
+  _cleanupOldLows(currentKey) {
+    try {
+      const prefix = `swc-low:${this._config.entity}:`;
+      const stale = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith(prefix) && !k.endsWith(currentKey)) stale.push(k);
+      }
+      stale.forEach((k) => localStorage.removeItem(k));
+    } catch (e) {
+      // ignora: la pulizia e' solo un'ottimizzazione, non e' critica
+    }
+  }
+
   async _fetchForecast(type) {
     try {
       const response = await this._hass.callWS({
@@ -1422,7 +1589,7 @@ class SunWeatherCard extends HTMLElement {
     const days = this._daily.slice(0, this._config.forecast_days);
     const dayFmt = new Intl.DateTimeFormat(this._locale(), { weekday: 'short' });
 
-    const lows = days.map((d) => d.templow).filter((v) => v != null);
+    const lows = days.map((d) => this._dayLow(d)).filter((v) => v != null);
     const highs = days.map((d) => d.temperature).filter((v) => v != null);
     const globalMin = Math.min(...lows, ...highs);
     const globalMax = Math.max(...lows, ...highs);
@@ -1436,11 +1603,25 @@ class SunWeatherCard extends HTMLElement {
     const anyPrecip = showPrecip && days.some((d) => d.precipitation != null && d.precipitation > 0);
     const todayStr = new Date().toDateString();
 
+    // evita di ricostruire l'intera lista (e riavviare le animazioni delle
+    // icone) se i dati mostrati non sono davvero cambiati
+    const barsSig = JSON.stringify({
+      animated: this._config.animated_icons !== false,
+      showPrecip,
+      currentTemp: currentTemp != null ? Math.round(currentTemp * 10) / 10 : null,
+      days: days.map((d) => [d.datetime, d.temperature, this._dayLow(d), d.condition, d.precipitation]),
+    });
+    if (this._barsSig === barsSig) {
+      this._applyScroll(list, days.length);
+      return;
+    }
+    this._barsSig = barsSig;
+
     list.innerHTML = days
       .map((d) => {
         const date = new Date(d.datetime);
         const label = dayFmt.format(date);
-        const low = d.templow != null ? d.templow : d.temperature;
+        const low = this._dayLow(d);
         const high = d.temperature;
         const leftPct = ((low - globalMin) / span) * 100;
         const widthPct = Math.max(((high - low) / span) * 100, 8);
@@ -1509,6 +1690,18 @@ class SunWeatherCard extends HTMLElement {
       hour12: this._config.time_format === '12',
     });
 
+    // evita di ricostruire l'intera lista (e riavviare le animazioni delle
+    // icone) se i dati mostrati non sono davvero cambiati
+    const hourlySig = JSON.stringify({
+      animated: this._config.animated_icons !== false,
+      hours: hours.map((h) => [h.datetime, h.temperature, h.condition]),
+    });
+    if (this._hourlySig === hourlySig) {
+      this._applyScroll(list, hours.length);
+      return;
+    }
+    this._hourlySig = hourlySig;
+
     list.innerHTML = hours
       .map((h) => {
         const date = new Date(h.datetime);
@@ -1576,7 +1769,7 @@ class SunWeatherCard extends HTMLElement {
     const highs = days.map((d) => d.temperature).filter((v) => v != null);
     const lows = hourly
       ? highs
-      : days.map((d) => (d.templow != null ? d.templow : d.temperature)).filter((v) => v != null);
+      : days.map((d) => this._dayLow(d)).filter((v) => v != null);
     const gMax = Math.max(...highs);
     const gMin = Math.min(...lows);
     const span = Math.max(gMax - gMin, 1);
@@ -1588,10 +1781,18 @@ class SunWeatherCard extends HTMLElement {
     //   della card (niente scroll, niente colonne tagliate).
     const visible = this._config.visible_rows;
     let col = 64;
-    const cs = getComputedStyle(list);
-    const padL = parseFloat(cs.paddingLeft) || 0;
-    const padR = parseFloat(cs.paddingRight) || 0;
-    const cw = list.clientWidth - padL - padR;
+    // larghezza del contenitore: presa dalla cache aggiornata dal
+    // ResizeObserver invece di leggere clientWidth/getComputedStyle qui, che
+    // forzerebbe un reflow sincrono a ogni singolo tick di hass anche quando
+    // il grafico risulta poi invariato (vedi graphSig sotto)
+    let cw = this._graphColWidth;
+    if (cw == null) {
+      const cs = getComputedStyle(list);
+      const padL = parseFloat(cs.paddingLeft) || 0;
+      const padR = parseFloat(cs.paddingRight) || 0;
+      cw = list.clientWidth - padL - padR;
+      this._graphColWidth = cw;
+    }
     if (cw > 0) {
       // divisore: giorni visibili impostati, oppure tutti i giorni caricati
       const divisor = visible || days.length;
@@ -1602,6 +1803,26 @@ class SunWeatherCard extends HTMLElement {
       requestAnimationFrame(() => this._renderForecastGraph(hourly));
     }
     const w = days.length * col;
+
+    // evita di ricostruire l'intero SVG (e riavviare le animazioni delle
+    // icone) se i dati non sono davvero cambiati — hass puo' aggiornarsi
+    // molte volte al minuto per sensori che non c'entrano nulla con questa
+    // card, e ogni volta questo metodo veniva richiamato da _render()
+    const colorByTemp = this._config.graph_color_by_temp === true;
+    const graphSig = JSON.stringify({
+      hourly,
+      col,
+      colorByTemp,
+      animated: this._config.animated_icons !== false,
+      showPrecip,
+      days: days.map((d) => [d.datetime, d.temperature, hourly ? null : this._dayLow(d), d.condition, d.precipitation]),
+    });
+    if (this._graphSig === graphSig) {
+      list.style.maxHeight = 'none';
+      return;
+    }
+    this._graphSig = graphSig;
+
     const yDay = 14;                // etichetta giorno/ora
     const yIcon = 24;              // riga icone (top del box icona)
     const iconSize = 26;
@@ -1610,17 +1831,48 @@ class SunWeatherCard extends HTMLElement {
     const bandH = hourly ? 34 : 42; // banda temperature (piu' bassa per l'oraria)
     const minLabelH = hourly ? 6 : 20;
     const hasPrecipRow = showPrecip && days.some((d) => d.precipitation != null && d.precipitation > 0);
-    const precipH = hasPrecipRow ? 12 : 0;
-    const h = bandTop + bandH + minLabelH + precipH + 6;
+    // area riservata alle barre di pioggia: uno spazio sopra per la barra
+    // stessa (barGap + barMaxH) e uno sotto per l'etichetta in mm
+    const barGap = 8;     // distanza tra l'etichetta temp. minima e la cima della barra
+    const barMaxH = 15;   // altezza massima di una barra (al valore di pioggia piu' alto)
+    const barLabelH = 14; // spazio per l'etichetta "x mm" sotto la barra
+    const precipH = hasPrecipRow ? (barGap + barMaxH + barLabelH) : 0;
+    const h = bandTop + bandH + minLabelH + precipH;
+    // valore massimo di pioggia tra i giorni mostrati, per scalare le barre
+    const maxPrecip = hasPrecipRow
+      ? Math.max(...days.map((d) => (d.precipitation != null ? d.precipitation : 0)))
+      : 0;
+    // riga di base delle barre (dove poggiano), e larghezza di ciascuna barra
+    const barBase = bandTop + bandH + minLabelH + barGap + barMaxH;
+    const barWidth = Math.max(Math.min(col * 0.42, 22), 8);
 
     const x = (i) => i * col + col / 2;
     const yT = (t) => bandTop + (1 - (t - gMin) / span) * bandH;
 
     const ptsMax = days.map((d, i) => [x(i), yT(d.temperature)]);
     const ptsMin = hourly ? [] : days.map((d, i) => {
-      const lo = d.templow != null ? d.templow : d.temperature;
+      const lo = this._dayLow(d);
       return [x(i), yT(lo)];
     });
+
+    // colori per temperatura, usati solo se graph_color_by_temp e' attivo:
+    // un colore per ogni punto, per costruire i gradienti orizzontali delle
+    // linee e colorare i pallini di conseguenza.
+    const maxColors = days.map((d) => this._tempToColor(d.temperature));
+    const minColors = hourly ? [] : days.map((d) => this._tempToColor(this._dayLow(d)));
+
+    // stop di un linearGradient orizzontale (userSpaceOnUse, 0..w) da una serie
+    // di punti e colori corrispondenti
+    const gradStops = (pts, colors, opacity) => pts.map((p, i) => {
+      const off = (Math.min(Math.max(p[0], 0), w) / (w || 1) * 100).toFixed(2);
+      return `<stop offset="${off}%" stop-color="${colors[i]}" stop-opacity="${opacity != null ? opacity : 1}"/>`;
+    }).join('');
+
+    const gradMaxStops = colorByTemp ? gradStops(ptsMax, maxColors) : '';
+    const gradAreaStops = colorByTemp
+      ? gradStops(ptsMax, maxColors, 0.28)
+      : `<stop offset="0%" stop-color="#ff7a59" stop-opacity="0.28"/><stop offset="100%" stop-color="#ff7a59" stop-opacity="0"/>`;
+    const gradMinStops = (colorByTemp && !hourly) ? gradStops(ptsMin, minColors) : '';
 
     // path con curve morbide (Catmull-Rom -> Bézier)
     const smooth = (pts) => {
@@ -1642,10 +1894,21 @@ class SunWeatherCard extends HTMLElement {
     };
 
     const lineMax = smooth(this._extendToEdges(ptsMax, w));
-    const lineMin = hourly ? '' : smooth(this._extendToEdges(ptsMin, w));
-    // area sfumata sotto la linea max (segue la linea estesa fino ai bordi)
-    const areaBottom = bandTop + bandH + 2;
-    const areaMax = `${lineMax} L ${w} ${areaBottom} L 0 ${areaBottom} Z`;
+    const extMin = hourly ? [] : this._extendToEdges(ptsMin, w);
+    const lineMin = hourly ? '' : smooth(extMin);
+
+    // area sfumata: per il grafico giornaliero riempie la fascia TRA le due
+    // linee (max e min) quando colorByTemp e' attivo (segue esattamente lo
+    // spazio tra le curve); altrimenti (o in modalita' oraria) riempie sotto
+    // fino al fondo, come nel grafico a colore fisso.
+    let areaMax;
+    if (colorByTemp && !hourly && extMin.length) {
+      const reverseMin = smooth(extMin.slice().reverse()).replace(/^M/, 'L');
+      areaMax = `${lineMax} ${reverseMin} Z`;
+    } else {
+      const areaBottom = bandTop + bandH + 2;
+      areaMax = `${lineMax} L ${w} ${areaBottom} L 0 ${areaBottom} Z`;
+    }
 
     const dayLabels = days.map((d, i) =>
       `<text class="g-day" x="${x(i)}" y="${yDay}" text-anchor="middle">${colLabel(d)}</text>`
@@ -1665,51 +1928,54 @@ class SunWeatherCard extends HTMLElement {
 
     const minLabels = hourly ? '' : days.map((d, i) => {
       const [px, py] = ptsMin[i];
-      const lo = d.templow != null ? d.templow : d.temperature;
+      const lo = this._dayLow(d);
       return `<text class="g-tmin" x="${px}" y="${py + 17}" text-anchor="middle">${Math.round(lo)}\u00b0</text>`;
     }).join('');
 
-    const precipLabels = hasPrecipRow ? days.map((d, i) => {
-      if (d.precipitation == null || d.precipitation <= 0) return '';
-      return `<text class="g-precip" x="${x(i)}" y="${h - 6}" text-anchor="middle">${d.precipitation} ${precipUnit}</text>`;
+    // barre blu della pioggia: altezza proporzionale al valore rispetto al
+    // massimo del set di giorni mostrati; una barra "trascurabile" ma > 0
+    // resta comunque visibile con un'altezza minima di 3px.
+    const precipBars = hasPrecipRow ? days.map((d, i) => {
+      const val = d.precipitation;
+      if (val == null || val <= 0) return '';
+      const bh = maxPrecip > 0 ? Math.max((val / maxPrecip) * barMaxH, 3) : 0;
+      const bx = (x(i) - barWidth / 2).toFixed(1);
+      const by = (barBase - bh).toFixed(1);
+      return `<rect class="g-bar-precip" x="${bx}" y="${by}" width="${barWidth.toFixed(1)}" height="${bh.toFixed(1)}" rx="2" ry="2" />`;
     }).join('') : '';
 
-    const colorByTemp = this._config.graph_color_by_temp === true;
-    const gid = (this._iconUid += 1);
-    const tempsMax = days.map((d) => d.temperature);
-    const tempsMin = days.map((d) => (d.templow != null ? d.templow : d.temperature));
-    const stopsFor = (pts, temps) => pts.map((p, i) => {
-      const off = Math.max(0, Math.min(100, (p[0] / w) * 100));
-      return `<stop offset="${off.toFixed(1)}%" stop-color="${this._tempToColor(temps[i])}"/>`;
-    }).join('');
-    const gradMax = colorByTemp
-      ? `<linearGradient id="gLineMax${gid}" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="${w}" y2="0">${stopsFor(ptsMax, tempsMax)}</linearGradient>`
-      : '';
-    const gradMin = (colorByTemp && !hourly)
-      ? `<linearGradient id="gLineMin${gid}" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="${w}" y2="0">${stopsFor(ptsMin, tempsMin)}</linearGradient>`
-      : '';
-    const maxStroke = colorByTemp ? ` style="stroke:url(#gLineMax${gid})"` : '';
-    const minStroke = colorByTemp ? ` style="stroke:url(#gLineMin${gid})"` : '';
+    const precipLabels = hasPrecipRow ? days.map((d, i) => {
+      if (d.precipitation == null || d.precipitation <= 0) return '';
+      return `<text class="g-precip" x="${x(i)}" y="${(barBase + barLabelH - 2).toFixed(1)}" text-anchor="middle">${d.precipitation} ${precipUnit}</text>`;
+    }).join('') : '';
 
     const dotsMax = ptsMax.map((p, i) => {
-      const s = colorByTemp ? ` style="stroke:${this._tempToColor(tempsMax[i])}"` : '';
+      const s = colorByTemp ? ` style="stroke:${maxColors[i]};"` : '';
       return `<circle class="g-dot-max" cx="${p[0]}" cy="${p[1]}" r="3"${s} />`;
     }).join('');
     const dotsMin = hourly ? '' : ptsMin.map((p, i) => {
-      const s = colorByTemp ? ` style="stroke:${this._tempToColor(tempsMin[i])}"` : '';
+      const s = colorByTemp ? ` style="stroke:${minColors[i]};"` : '';
       return `<circle class="g-dot-min" cx="${p[0]}" cy="${p[1]}" r="3"${s} />`;
     }).join('');
 
+    const maxStroke = colorByTemp ? ` style="stroke:url(#gLineMax);"` : '';
+    const minStroke = colorByTemp ? ` style="stroke:url(#gLineMin);"` : '';
     const lineMinSvg = hourly ? '' : `<path class="g-line-min" d="${lineMin}"${minStroke} />`;
 
     list.innerHTML = `
       <svg class="fc-graph" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" preserveAspectRatio="xMinYMid meet">
         <defs>
-          <linearGradient id="gMaxArea" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#ff7a59" stop-opacity="0.28"/>
-            <stop offset="100%" stop-color="#ff7a59" stop-opacity="0"/>
+          <linearGradient id="gMaxArea" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="${w}" y2="0">
+            ${gradAreaStops}
           </linearGradient>
-          ${gradMax}${gradMin}
+          ${colorByTemp ? `
+          <linearGradient id="gLineMax" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="${w}" y2="0">
+            ${gradMaxStops}
+          </linearGradient>` : ''}
+          ${(colorByTemp && !hourly) ? `
+          <linearGradient id="gLineMin" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="${w}" y2="0">
+            ${gradMinStops}
+          </linearGradient>` : ''}
         </defs>
         ${dayLabels}
         ${icons}
@@ -1718,6 +1984,7 @@ class SunWeatherCard extends HTMLElement {
         ${lineMinSvg}
         ${dotsMax}${dotsMin}
         ${maxLabels}${minLabels}
+        ${precipBars}
         ${precipLabels}
       </svg>
     `;
@@ -1745,10 +2012,52 @@ class SunWeatherCard extends HTMLElement {
     });
   }
 
+  // Tabella di colori per temperatura (°C -> hex), la stessa usata altrove
+  // nella dashboard. Interpolata linearmente tra i punti definiti; fuori
+  // dall'intervallo 0-40 il colore si blocca sull'estremo piu' vicino.
+  static get TEMP_COLOR_STOPS() {
+    return [
+      [0, '#0000FF'], [1, '#0019E6'], [2, '#0033CC'], [3, '#004CB3'],
+      [4, '#006699'], [5, '#008080'], [6, '#009966'], [7, '#00B34D'],
+      [8, '#00CC33'], [9, '#00E619'], [10, '#00FF00'], [11, '#19FF00'],
+      [12, '#33FF00'], [13, '#4CFF00'], [14, '#66FF00'], [15, '#80FF00'],
+      [16, '#99FF00'], [17, '#B3FF00'], [18, '#CCFF00'], [19, '#E6FF00'],
+      [20, '#FFFF00'], [21, '#FFE600'], [22, '#FFCC00'], [23, '#FFB300'],
+      [24, '#FF9900'], [25, '#FF8000'], [26, '#FF6600'], [27, '#FF4D00'],
+      [28, '#FF3300'], [29, '#FF1900'], [30, '#FF0000'], [31, '#E60000'],
+      [32, '#CC0000'], [33, '#B30000'], [34, '#990000'], [35, '#800000'],
+      [36, '#660000'], [37, '#530000'], [38, '#400000'], [39, '#2D0000'],
+      [40, '#1A0000'],
+    ];
+  }
+
+  _hexToRgb(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+
+  _rgbToHex(r, g, b) {
+    const c = (v) => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, '0');
+    return `#${c(r)}${c(g)}${c(b)}`;
+  }
+
   _tempToColor(t) {
-    const clamped = Math.min(Math.max(t, -10), 35);
-    const hue = 235 - ((clamped + 10) / 45) * 235;
-    return `hsl(${hue}, 85%, 55%)`;
+    const stops = SunWeatherCard.TEMP_COLOR_STOPS;
+    const clamped = Math.min(Math.max(t, stops[0][0]), stops[stops.length - 1][0]);
+
+    // trova la coppia di stop che racchiude il valore
+    let i = 0;
+    while (i < stops.length - 2 && clamped > stops[i + 1][0]) i++;
+    const [v0, c0] = stops[i];
+    const [v1, c1] = stops[i + 1];
+    const frac = v1 > v0 ? (clamped - v0) / (v1 - v0) : 0;
+
+    const [r0, g0, b0] = this._hexToRgb(c0);
+    const [r1, g1, b1] = this._hexToRgb(c1);
+    const r = r0 + (r1 - r0) * frac;
+    const g = g0 + (g1 - g0) * frac;
+    const b = b0 + (b1 - b0) * frac;
+    return this._rgbToHex(r, g, b);
   }
 
   _cloudPath() {
@@ -3016,7 +3325,7 @@ window.customCards.push({
 });
 
 console.info(
-  '%c SUN-WEATHER-CARD %c 1.7.0 ',
+  '%c SUN-WEATHER-CARD %c 1.7.0-sticky-low ',
   'color: white; background: #ff7a59; font-weight: 700;',
   'color: #ff7a59; background: #1c1c1c; font-weight: 700;'
 );
