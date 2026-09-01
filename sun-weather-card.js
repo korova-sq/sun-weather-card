@@ -1,7 +1,7 @@
 /**
  * Sun Weather Card
  * https://github.com/korova-sq/sun-weather-card
- * Version: 1.7.0
+ * Version: 1.8.0
  *
  * A weather card with an animated current-conditions header, a sunrise/sunset
  * arc, and daily/hourly forecasts shown as iOS-style bars or a line graph.
@@ -147,6 +147,8 @@ class SunWeatherCard extends HTMLElement {
       // nel layout 'graph': false = linee a colore fisso (arancio/azzurro);
       // true = linee colorate in base alla temperatura come le barre
       graph_color_by_temp: false,
+      // nel layout 'graph': false = pioggia come testo; true = barrette
+      graph_precip_bars: false,
       // quante righe di previsione restano sempre visibili; le altre
       // diventano scrollabili verticalmente. null = mostra tutte senza scroll.
       visible_rows: null,
@@ -175,6 +177,23 @@ class SunWeatherCard extends HTMLElement {
     this._dailyFetchedAt = 0;
     this._hourlyFetchedAt = 0;
     this._iconUid = 0;
+    // firma dell'icona corrente: evita di ricostruirla (e riavviare la sua
+    // animazione) quando hass si aggiorna per entita' che non c'entrano nulla
+    this._curIconSig = null;
+    // firme dei dettagli: evitano di riscrivere la griglia (e riagganciare i
+    // tooltip) quando il contenuto mostrato non e' cambiato
+    this._detailsHtml = null;
+    this._customDetailsHtml = null;
+    // firme delle previsioni: evitano di ricostruire barre/orarie/grafico
+    // quando i dati mostrati non sono cambiati. _lastForecastKind serve a
+    // resettarle quando si cambia modalita'/layout (stesso contenitore condiviso)
+    this._barsSig = null;
+    this._hourlySig = null;
+    this._graphSig = null;
+    this._lastForecastKind = null;
+    // larghezza utile del contenitore grafico, misurata via ResizeObserver
+    // invece che a ogni render (evita un reflow sincrono per tick)
+    this._graphWidth = 0;
 
     if (!this.shadowRoot) {
       this.attachShadow({ mode: 'open' });
@@ -993,9 +1012,14 @@ class SunWeatherCard extends HTMLElement {
     if (!wState) return;
 
     let condition = wState.state;
-    // di notte, se la condizione e' "sunny" mostriamo comunque icona notturna coerente
+    // di notte converti le condizioni "diurne" (sole / parz. nuvoloso) nelle
+    // varianti notturne: alcune integrazioni mandano sunny/partlycloudy anche
+    // di notte, e senza questo l'icona principale mostrerebbe il sole di notte
     const night = this._isNight(now);
-    if (condition === 'sunny' && night) condition = 'clear-night';
+    if (night) {
+      if (condition === 'sunny') condition = 'clear-night';
+      else if (condition === 'partlycloudy') condition = 'partlycloudy-night';
+    }
 
     const temp = wState.attributes.temperature;
     const unit = wState.attributes.temperature_unit || '\u00b0';
@@ -1027,9 +1051,18 @@ class SunWeatherCard extends HTMLElement {
       }
     }
 
-    this._iconUid += 1;
-    this.shadowRoot.getElementById('cur-icon').innerHTML =
-      this._icon(condition, this._iconUid, 68);
+    // ricostruisci l'icona grande solo se la condizione mostrata (o l'on/off
+    // delle animazioni) e' davvero cambiata: hass puo' aggiornarsi molte volte
+    // al minuto per sensori che non c'entrano nulla con questa card, e ogni
+    // ricostruzione riavvierebbe l'animazione SMIL da capo
+    const animatedFlag = this._config.animated_icons !== false;
+    const curIconSig = `${condition}|${animatedFlag}`;
+    if (this._curIconSig !== curIconSig) {
+      this._curIconSig = curIconSig;
+      this._iconUid += 1;
+      this.shadowRoot.getElementById('cur-icon').innerHTML =
+        this._icon(condition, this._iconUid, 68);
+    }
     const descEl = this.shadowRoot.getElementById('cur-desc');
     descEl.textContent = this._conditionLabel(wState.state);
     this._fitConditionText(descEl);
@@ -1098,7 +1131,7 @@ class SunWeatherCard extends HTMLElement {
     const box = this.shadowRoot.getElementById('details');
     if (!box) return;
     const wState = this._hass.states[this._config.entity];
-    if (!wState) { box.innerHTML = ''; return; }
+    if (!wState) { box.innerHTML = ''; this._detailsHtml = ''; return; }
     const a = wState.attributes;
 
     // valore di oggi dalla previsione giornaliera (per precipitazioni)
@@ -1207,7 +1240,11 @@ class SunWeatherCard extends HTMLElement {
           </div>`;
       });
 
-    box.innerHTML = stdItems.join('');
+    const stdHtml = stdItems.join('');
+    if (this._detailsHtml !== stdHtml) {
+      this._detailsHtml = stdHtml;
+      box.innerHTML = stdHtml;
+    }
 
     // sensori personalizzati: griglia separata a 2 colonne sotto gli standard.
     // Il nome puo' essere mostrato sotto il valore (show_sensor_names, default ON)
@@ -1262,9 +1299,13 @@ class SunWeatherCard extends HTMLElement {
               ${nameHtml}
             </div>`;
         });
-      cbox.innerHTML = customItems.join('');
-      cbox.style.display = customItems.some((x) => x) ? '' : 'none';
-      this._wireDetailTips(cbox);
+      const customHtml = customItems.join('');
+      if (this._customDetailsHtml !== customHtml) {
+        this._customDetailsHtml = customHtml;
+        cbox.innerHTML = customHtml;
+        cbox.style.display = customItems.some((x) => x) ? '' : 'none';
+        this._wireDetailTips(cbox);
+      }
     }
   }
 
@@ -1402,6 +1443,18 @@ class SunWeatherCard extends HTMLElement {
   _renderForecast() {
     const scroll = this.shadowRoot.getElementById('forecast-scroll');
     const graph = this._config.forecast_layout === 'graph';
+    // se cambia il "tipo" di previsione mostrata (barre/orarie/grafico), azzera
+    // le firme: lo stesso contenitore e' condiviso, quindi il nuovo renderer
+    // deve sempre ridisegnare invece di saltare per firma uguale
+    const kind = graph
+      ? (this._forecastMode === 'hourly' ? 'graph-hourly' : 'graph-daily')
+      : (this._forecastMode === 'hourly' ? 'hourly' : 'daily');
+    if (kind !== this._lastForecastKind) {
+      this._lastForecastKind = kind;
+      this._barsSig = null;
+      this._hourlySig = null;
+      this._graphSig = null;
+    }
     if (graph) {
       if (scroll) scroll.classList.add('graph-mode');
       if (this._forecastMode === 'hourly') this._renderForecastGraph(true);
@@ -1435,6 +1488,15 @@ class SunWeatherCard extends HTMLElement {
     const showPrecip = this._config.show_forecast_precipitation;
     const anyPrecip = showPrecip && days.some((d) => d.precipitation != null && d.precipitation > 0);
     const todayStr = new Date().toDateString();
+
+    // firma sui DATI (non sull'HTML: le icone hanno un uid che cambia a ogni
+    // render). Se nulla e' cambiato, non ricostruire ne' riapplicare lo scroll.
+    const barsSig = JSON.stringify({
+      d: days.map((x) => [x.datetime, x.condition, x.temperature, x.templow, x.precipitation]),
+      currentTemp, showPrecip, anyPrecip, precipUnit,
+    });
+    if (this._barsSig === barsSig) return;
+    this._barsSig = barsSig;
 
     list.innerHTML = days
       .map((d) => {
@@ -1496,6 +1558,7 @@ class SunWeatherCard extends HTMLElement {
     const hours = (this._hourly || []).slice(0, this._config.forecast_hours);
     if (!hours.length) {
       list.innerHTML = '';
+      this._hourlySig = '';
       return;
     }
 
@@ -1508,6 +1571,14 @@ class SunWeatherCard extends HTMLElement {
       hour: 'numeric',
       hour12: this._config.time_format === '12',
     });
+
+    // firma sui DATI (la condizione e' quella gia' adattata giorno/notte, cosi'
+    // riflette esattamente l'icona disegnata). Se invariata, non ricostruire.
+    const hourlySig = JSON.stringify(
+      hours.map((h) => [h.datetime, this._nightCondition(h.condition, h.datetime), h.temperature])
+    );
+    if (this._hourlySig === hourlySig) return;
+    this._hourlySig = hourlySig;
 
     list.innerHTML = hours
       .map((h) => {
@@ -1554,6 +1625,31 @@ class SunWeatherCard extends HTMLElement {
 
   // Grafico orizzontale. hourly=false: due linee max/min per giorno.
   // hourly=true: una linea temperatura per ora, con l'ora sotto.
+  // Misura la larghezza utile del contenitore (dentro il padding). Chiamata
+  // solo al primo render e sui resize, non a ogni tick di hass.
+  _measureGraphWidth(list) {
+    const cs = getComputedStyle(list);
+    const padL = parseFloat(cs.paddingLeft) || 0;
+    const padR = parseFloat(cs.paddingRight) || 0;
+    return list.clientWidth - padL - padR;
+  }
+
+  // Crea una sola volta un ResizeObserver sul contenitore: quando la larghezza
+  // cambia davvero aggiorna la cache e, se siamo in grafico, ridisegna.
+  _ensureGraphResizeObserver(list) {
+    if (this._graphResizeObs || typeof ResizeObserver === 'undefined') return;
+    this._graphResizeObs = new ResizeObserver(() => {
+      const l = this.shadowRoot && this.shadowRoot.getElementById('forecast-scroll');
+      if (!l) return;
+      const w = this._measureGraphWidth(l);
+      if (w > 0 && w !== this._graphWidth) {
+        this._graphWidth = w;
+        if (this._config.forecast_layout === 'graph') this._renderForecast();
+      }
+    });
+    this._graphResizeObs.observe(list);
+  }
+
   _renderForecastGraph(hourly) {
     const list = this.shadowRoot.getElementById('forecast-scroll');
     const source = hourly ? this._hourly : this._daily;
@@ -1588,13 +1684,19 @@ class SunWeatherCard extends HTMLElement {
     //   della card (niente scroll, niente colonne tagliate).
     const visible = this._config.visible_rows;
     let col = 64;
-    const cs = getComputedStyle(list);
-    const padL = parseFloat(cs.paddingLeft) || 0;
-    const padR = parseFloat(cs.paddingRight) || 0;
-    const cw = list.clientWidth - padL - padR;
+    // larghezza cached (aggiornata dal ResizeObserver); al primo giro, se non
+    // ancora nota, la misuro una volta e attivo l'observer
+    this._ensureGraphResizeObserver(list);
+    let cw = this._graphWidth;
+    if (!cw) {
+      cw = this._measureGraphWidth(list);
+      this._graphWidth = cw;
+    }
     if (cw > 0) {
-      // divisore: giorni visibili impostati, oppure tutti i giorni caricati
-      const divisor = visible || days.length;
+      // divisore: i giorni visibili impostati, ma mai piu' dei giorni realmente
+      // disponibili — cosi' se l'entita' ne espone meno del previsto (es. 6 su 7)
+      // riempiono comunque tutta la larghezza invece di fermarsi a meta'
+      const divisor = Math.min(visible || days.length, days.length);
       // arrotonda per difetto cosi' non sbava mezza colonna in piu'
       col = Math.max(Math.floor((cw / divisor) * 100) / 100, 40);
     } else {
@@ -1610,8 +1712,24 @@ class SunWeatherCard extends HTMLElement {
     const bandH = hourly ? 34 : 42; // banda temperature (piu' bassa per l'oraria)
     const minLabelH = hourly ? 6 : 20;
     const hasPrecipRow = showPrecip && days.some((d) => d.precipitation != null && d.precipitation > 0);
-    const precipH = hasPrecipRow ? 12 : 0;
+    // pioggia come barrette (opt-in) invece che testo: serve piu' altezza
+    const precipBars = this._config.graph_precip_bars === true;
+    const precipH = hasPrecipRow ? (precipBars ? 26 : 12) : 0;
     const h = bandTop + bandH + minLabelH + precipH + 6;
+
+    // firma sui DATI + larghezza: se nulla e' cambiato non ricostruire l'SVG
+    // (punti, curve, gradienti, icone). La condizione e' quella adattata
+    // giorno/notte per l'oraria, cosi' riflette le icone luna disegnate.
+    const graphSig = JSON.stringify({
+      hourly, w, showPrecip, hasPrecipRow, precipUnit,
+      color: this._config.graph_color_by_temp === true,
+      bars: precipBars,
+      d: days.map((d) => [d.datetime,
+        hourly ? this._nightCondition(d.condition, d.datetime) : d.condition,
+        d.temperature, d.templow, d.precipitation]),
+    });
+    if (this._graphSig === graphSig) return;
+    this._graphSig = graphSig;
 
     const x = (i) => i * col + col / 2;
     const yT = (t) => bandTop + (1 - (t - gMin) / span) * bandH;
@@ -1641,11 +1759,41 @@ class SunWeatherCard extends HTMLElement {
       return d;
     };
 
+    // colori/gradienti temperatura: definiti PRIMA dell'area cosi' il band fill
+    // puo' riutilizzare il gradiente della linea max
+    const colorByTemp = this._config.graph_color_by_temp === true;
+    const gid = (this._iconUid += 1);
+    const tempsMax = days.map((d) => d.temperature);
+    const tempsMin = days.map((d) => (d.templow != null ? d.templow : d.temperature));
+    const stopsFor = (pts, temps) => pts.map((p, i) => {
+      const off = Math.max(0, Math.min(100, (p[0] / w) * 100));
+      return `<stop offset="${off.toFixed(1)}%" stop-color="${this._tempToColor(temps[i])}"/>`;
+    }).join('');
+    const gradMax = colorByTemp
+      ? `<linearGradient id="gLineMax${gid}" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="${w}" y2="0">${stopsFor(ptsMax, tempsMax)}</linearGradient>`
+      : '';
+    const gradMin = (colorByTemp && !hourly)
+      ? `<linearGradient id="gLineMin${gid}" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="${w}" y2="0">${stopsFor(ptsMin, tempsMin)}</linearGradient>`
+      : '';
+    const maxStroke = colorByTemp ? ` style="stroke:url(#gLineMax${gid})"` : '';
+    const minStroke = colorByTemp ? ` style="stroke:url(#gLineMin${gid})"` : '';
+
     const lineMax = smooth(this._extendToEdges(ptsMax, w));
     const lineMin = hourly ? '' : smooth(this._extendToEdges(ptsMin, w));
-    // area sfumata sotto la linea max (segue la linea estesa fino ai bordi)
+    // area: con i colori attivi riempi la FASCIA tra max e min (band fill) col
+    // gradiente temperatura; altrimenti resta la sfumatura arancione verso il
+    // basso come prima (nessun cambiamento per chi non usa i colori)
     const areaBottom = bandTop + bandH + 2;
-    const areaMax = `${lineMax} L ${w} ${areaBottom} L 0 ${areaBottom} Z`;
+    let areaMax;
+    let areaFill = '';
+    if (colorByTemp && !hourly) {
+      const minExt = this._extendToEdges(ptsMin, w);
+      const lineMinRev = smooth([...minExt].reverse()); // dal punto min piu' a destra
+      areaMax = `${lineMax} L${lineMinRev.slice(1)} Z`;
+      areaFill = ` style="fill:url(#gLineMax${gid});opacity:0.10"`;
+    } else {
+      areaMax = `${lineMax} L ${w} ${areaBottom} L 0 ${areaBottom} Z`;
+    }
 
     const dayLabels = days.map((d, i) =>
       `<text class="g-day" x="${x(i)}" y="${yDay}" text-anchor="middle">${colLabel(d)}</text>`
@@ -1669,27 +1817,29 @@ class SunWeatherCard extends HTMLElement {
       return `<text class="g-tmin" x="${px}" y="${py + 17}" text-anchor="middle">${Math.round(lo)}\u00b0</text>`;
     }).join('');
 
-    const precipLabels = hasPrecipRow ? days.map((d, i) => {
-      if (d.precipitation == null || d.precipitation <= 0) return '';
-      return `<text class="g-precip" x="${x(i)}" y="${h - 6}" text-anchor="middle">${d.precipitation} ${precipUnit}</text>`;
-    }).join('') : '';
+    const precipLabels = !hasPrecipRow ? '' : (precipBars
+      ? (() => {
+          // riferimento assoluto con soglia minima: cosi' 0.1mm resta una
+          // barretta piccola invece di riempire tutto solo perche' e' il massimo
+          // del giorno; su giorni molto piovosi il riferimento sale al massimo
+          const maxP = Math.max(...days.map((d) => (d.precipitation > 0 ? d.precipitation : 0)), 0.1);
+          const ref = Math.max(maxP, 8);
+          const barBottom = h - 12;   // base delle barrette (sotto: il valore)
+          const barMaxH = 16, barMinH = 3, barW = 16;
+          return days.map((d, i) => {
+            if (d.precipitation == null || d.precipitation <= 0) return '';
+            const bh = barMinH + Math.min(d.precipitation / ref, 1) * (barMaxH - barMinH);
+            const bx = (x(i) - barW / 2).toFixed(1);
+            const by = (barBottom - bh).toFixed(1);
+            return `<rect x="${bx}" y="${by}" width="${barW}" height="${bh.toFixed(1)}" rx="2.5" fill="#4d9de0" opacity="0.85" />`
+              + `<text class="g-precip" x="${x(i)}" y="${h - 3}" text-anchor="middle">${d.precipitation} ${precipUnit}</text>`;
+          }).join('');
+        })()
+      : days.map((d, i) => {
+          if (d.precipitation == null || d.precipitation <= 0) return '';
+          return `<text class="g-precip" x="${x(i)}" y="${h - 6}" text-anchor="middle">${d.precipitation} ${precipUnit}</text>`;
+        }).join(''));
 
-    const colorByTemp = this._config.graph_color_by_temp === true;
-    const gid = (this._iconUid += 1);
-    const tempsMax = days.map((d) => d.temperature);
-    const tempsMin = days.map((d) => (d.templow != null ? d.templow : d.temperature));
-    const stopsFor = (pts, temps) => pts.map((p, i) => {
-      const off = Math.max(0, Math.min(100, (p[0] / w) * 100));
-      return `<stop offset="${off.toFixed(1)}%" stop-color="${this._tempToColor(temps[i])}"/>`;
-    }).join('');
-    const gradMax = colorByTemp
-      ? `<linearGradient id="gLineMax${gid}" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="${w}" y2="0">${stopsFor(ptsMax, tempsMax)}</linearGradient>`
-      : '';
-    const gradMin = (colorByTemp && !hourly)
-      ? `<linearGradient id="gLineMin${gid}" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="${w}" y2="0">${stopsFor(ptsMin, tempsMin)}</linearGradient>`
-      : '';
-    const maxStroke = colorByTemp ? ` style="stroke:url(#gLineMax${gid})"` : '';
-    const minStroke = colorByTemp ? ` style="stroke:url(#gLineMin${gid})"` : '';
 
     const dotsMax = ptsMax.map((p, i) => {
       const s = colorByTemp ? ` style="stroke:${this._tempToColor(tempsMax[i])}"` : '';
@@ -1713,7 +1863,7 @@ class SunWeatherCard extends HTMLElement {
         </defs>
         ${dayLabels}
         ${icons}
-        <path class="g-area-max" d="${areaMax}" />
+        <path class="g-area-max" d="${areaMax}"${areaFill} />
         <path class="g-line-max" d="${lineMax}"${maxStroke} />
         ${lineMinSvg}
         ${dotsMax}${dotsMin}
@@ -1746,9 +1896,18 @@ class SunWeatherCard extends HTMLElement {
   }
 
   _tempToColor(t) {
+    // fino a 35°: scala invariata (blu a -10° -> rosso pieno a 35°)
     const clamped = Math.min(Math.max(t, -10), 35);
     const hue = 235 - ((clamped + 10) / 45) * 235;
-    return `hsl(${hue}, 85%, 55%)`;
+    // sopra i 35°: stesso rosso ma progressivamente piu' scuro fino a 40°,
+    // cosi' le temperature molto alte (ormai frequenti d'estate) si distinguono
+    // senza cambiare nulla sotto i 35°
+    let light = 55;
+    if (t > 35) {
+      const over = Math.min(t, 40) - 35;   // 0..5
+      light = 55 - (over / 5) * 13;         // 55% -> 42%
+    }
+    return `hsl(${hue}, 85%, ${light}%)`;
   }
 
   _cloudPath() {
@@ -1835,6 +1994,10 @@ class SunWeatherCard extends HTMLElement {
             <line x1="1.5" y1="8" x2="3.5" y2="8"/>
             <line x1="3.4" y1="3.4" x2="4.8" y2="4.8"/>
             <line x1="12.6" y1="3.4" x2="11.2" y2="4.8"/>
+            <line x1="12.5" y1="8" x2="14.5" y2="8"/>
+            <line x1="8" y1="12.5" x2="8" y2="14.5"/>
+            <line x1="3.4" y1="12.6" x2="4.8" y2="11.2"/>
+            <line x1="12.6" y1="12.6" x2="11.2" y2="11.2"/>
             <animateTransform attributeName="transform" type="rotate" from="0 8 8" to="360 8 8" dur="28s" repeatCount="indefinite"/>
           </g>
           <circle cx="8" cy="8" r="3.4" fill="#ffb703"/>
@@ -1973,6 +2136,42 @@ class SunWeatherCard extends HTMLElement {
     return 5;
   }
 
+  // avvia un timer proprio per l'orologio: cosi' l'ora resta precisa anche
+  // quando hass non si aggiorna. Nessun secondo: il testo cambia solo al minuto.
+  connectedCallback() {
+    if (!this._clockTimer) {
+      this._clockTimer = setInterval(() => this._tickClock(), 1000);
+    }
+    this._tickClock();
+  }
+
+  _tickClock() {
+    if (!this._config || !this.shadowRoot) return;
+    const now = new Date();
+    const timeEl = this.shadowRoot.getElementById('time');
+    const dateEl = this.shadowRoot.getElementById('date');
+    if (timeEl && this._config.show_time !== false) {
+      const t = new Intl.DateTimeFormat(this._locale(), {
+        hour: '2-digit', minute: '2-digit', hour12: this._config.time_format === '12',
+      }).format(now);
+      if (timeEl.textContent !== t) timeEl.textContent = t; // scrive solo se cambia
+    }
+    if (dateEl && this._config.show_date !== false) {
+      const d = new Intl.DateTimeFormat(this._locale(), {
+        weekday: 'long', day: 'numeric', month: 'long',
+      }).format(now);
+      if (dateEl.textContent !== d) dateEl.textContent = d;
+    }
+  }
+
+  // quando la card viene rimossa dal DOM, smonta gli observer per non lasciarli
+  // attivi (verranno ricreati al primo render dopo un eventuale re-inserimento)
+  disconnectedCallback() {
+    if (this._clockTimer) { clearInterval(this._clockTimer); this._clockTimer = null; }
+    if (this._graphResizeObs) { this._graphResizeObs.disconnect(); this._graphResizeObs = null; }
+    if (this._descResizeObs) { this._descResizeObs.disconnect(); this._descResizeObs = null; }
+  }
+
   static getConfigElement() {
     return document.createElement('sun-weather-card-editor');
   }
@@ -2043,6 +2242,7 @@ const EDITOR_I18N = {
     daily_layout: 'Daily layout',
     dl_bars: 'Bars', dl_graph: 'Graph (lines)',
     graph_color_by_temp: 'Colour graph lines by temperature',
+    graph_precip_bars: 'Show precipitation as bars in the graph',
     days_to_load: 'Days to load',
     hours_to_load: 'Hours to load',
     visible_rows: 'Visible days (empty = all)',
@@ -2107,6 +2307,7 @@ const EDITOR_I18N = {
     daily_layout: 'Layout giornaliero',
     dl_bars: 'Barre', dl_graph: 'Grafico (linee)',
     graph_color_by_temp: 'Colora le linee del grafico per temperatura',
+    graph_precip_bars: 'Mostra le precipitazioni come barre nel grafico',
     days_to_load: 'Giorni da caricare',
     hours_to_load: 'Ore da caricare',
     visible_rows: 'Giorni visibili (vuoto = tutte)',
@@ -2171,6 +2372,7 @@ const EDITOR_I18N = {
     daily_layout: 'Tages-Layout',
     dl_bars: 'Balken', dl_graph: 'Diagramm (Linien)',
     graph_color_by_temp: 'Diagrammlinien nach Temperatur einfärben',
+    graph_precip_bars: 'Niederschlag als Balken im Diagramm anzeigen',
     days_to_load: 'Zu ladende Tage',
     hours_to_load: 'Zu ladende Stunden',
     visible_rows: 'Sichtbare Tage (leer = alle)',
@@ -2235,6 +2437,7 @@ const EDITOR_I18N = {
     daily_layout: 'Dagelijkse layout',
     dl_bars: 'Balken', dl_graph: 'Grafiek (lijnen)',
     graph_color_by_temp: 'Grafieklijnen kleuren op temperatuur',
+    graph_precip_bars: 'Neerslag als balken in de grafiek tonen',
     days_to_load: 'Te laden dagen',
     hours_to_load: 'Te laden uren',
     visible_rows: 'Zichtbare dagen (leeg = alle)',
@@ -2299,6 +2502,7 @@ const EDITOR_I18N = {
     daily_layout: 'Disposition quotidienne',
     dl_bars: 'Barres', dl_graph: 'Graphique (lignes)',
     graph_color_by_temp: 'Colorer les lignes du graphique selon la température',
+    graph_precip_bars: 'Afficher les précipitations en barres dans le graphique',
     days_to_load: 'Jours à charger',
     hours_to_load: 'Heures à charger',
     visible_rows: 'Jours visibles (vide = tous)',
@@ -2520,6 +2724,7 @@ class SunWeatherCardEditor extends HTMLElement {
       forecast_type: c.forecast_type || 'daily',
       forecast_layout: c.forecast_layout || 'bars',
       graph_color_by_temp: c.graph_color_by_temp === true,
+      graph_precip_bars: c.graph_precip_bars === true,
       forecast_days: c.forecast_days ?? 7,
       forecast_hours: c.forecast_hours ?? 24,
       visible_rows: c.visible_rows ?? null,
@@ -2538,6 +2743,7 @@ class SunWeatherCardEditor extends HTMLElement {
         { value: 'graph', label: this.t('dl_graph') },
       ]) },
       { name: 'graph_color_by_temp', selector: { boolean: {} } },
+      { name: 'graph_precip_bars', selector: { boolean: {} } },
       { name: 'visible_rows', selector: num(1, 15) },
       { name: 'forecast_days', selector: num(1, 15) },
       { name: 'forecast_hours', selector: num(1, 48) },
@@ -2547,6 +2753,7 @@ class SunWeatherCardEditor extends HTMLElement {
     const labels = {
       forecast_type: this.t('forecast_type'), forecast_layout: this.t('daily_layout'),
       graph_color_by_temp: this.t('graph_color_by_temp'),
+      graph_precip_bars: this.t('graph_precip_bars'),
       forecast_days: this.t('days_to_load'), forecast_hours: this.t('hours_to_load'),
       visible_rows: this.t('visible_rows'),
       show_forecast_precipitation: this.t('show_rain'),
@@ -2559,6 +2766,7 @@ class SunWeatherCardEditor extends HTMLElement {
       this._set('forecast_layout', v.forecast_layout);
       // graph_color_by_temp e' spento di default: salva solo se true
       this._set('graph_color_by_temp', v.graph_color_by_temp === true ? true : undefined);
+      this._set('graph_precip_bars', v.graph_precip_bars === true ? true : undefined);
       this._set('forecast_days', v.forecast_days);
       this._set('forecast_hours', v.forecast_hours);
       // visible_rows: vuoto/null = mostra tutte
@@ -3016,7 +3224,7 @@ window.customCards.push({
 });
 
 console.info(
-  '%c SUN-WEATHER-CARD %c 1.7.0 ',
+  '%c SUN-WEATHER-CARD %c 1.8.0 ',
   'color: white; background: #ff7a59; font-weight: 700;',
   'color: #ff7a59; background: #1c1c1c; font-weight: 700;'
 );

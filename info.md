@@ -5,7 +5,7 @@ forecasts as iOS‑style bars or a smooth line graph. Configurable from the UI.
 
 - Animated, hand‑drawn SVG weather icons (animations can be turned off)
 - Sunrise/sunset arc (or add sunrise/sunset to the details)
-- Bars **or** graph layout, daily **or** hourly (graph lines can be colour‑coded by temperature)
+- Bars **or** graph layout, daily **or** hourly (graph lines can be colour‑coded by temperature, precipitation as bars)
 - Transparent background or a custom background image with a light/dark overlay
 - Pick which detail attributes to show (they appear only if your integration
   provides them)

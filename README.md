@@ -48,7 +48,7 @@ Most weather cards on HACS show the forecast as a plain list. This card focuses 
 - 🌅 **Sunrise/sunset arc** – a light dotted arc with the sun (or moon at night) moving along it between sunrise and sunset.
 - 📊 **Configurable details** – pick which attributes to show below the arc (humidity, pressure, wind, precipitation, UV, sunrise/sunset and more), shown as a tidy grid. Each attribute is shown only if your weather integration provides it.
 - 📅 **Daily & hourly forecast** – choose `daily` or `hourly`.
-- 📈 **Two layouts** – classic **bars** (iOS‑style temperature range bars) or a **graph** (smooth temperature line, with max/min lines for daily). The graph lines can optionally be colour‑coded by temperature, matching the bar colours.
+- 📈 **Two layouts** – classic **bars** (iOS‑style temperature range bars) or a **graph** (smooth temperature line, with max/min lines for daily). In the graph, lines can optionally be colour‑coded by temperature and precipitation shown as bars.
 - 🎨 **Original animated SVG icons** for sun, moon, clouds, rain, snow, fog, wind and lightning. No external assets — animations can be turned off for lower-end devices.
 - 🖼️ **Transparent or image background** – make the card blend into your dashboard, or set a background image with an adjustable light/dark overlay for readability.
 - 🔧 **Custom sensors** – add any entity (or a specific attribute of it, e.g. the sun's elevation or next dawn) to the details, with an optional name, icon and decimal rounding. Shown as a tidy 4‑column grid or a left‑aligned flow; names can be displayed under each value or on tap.
@@ -128,6 +128,7 @@ All options can be set from the visual editor or in YAML.
 | `forecast_type` | string | `daily` | `daily` or `hourly`. |
 | `forecast_layout` | string | `bars` | `bars` or `graph`. |
 | `graph_color_by_temp` | boolean | `false` | In the `graph` layout, colour the temperature lines by value (same scale as the bars) instead of the fixed orange/teal colours. |
+| `graph_precip_bars` | boolean | `false` | In the `graph` layout, show precipitation as scaled bars instead of plain text labels. |
 | `forecast_days` | number | `7` | Number of days to load (daily). |
 | `forecast_hours` | number | `24` | Number of hours to load (hourly). |
 | `visible_rows` | number | *all* | How many rows/columns stay visible; the rest scrolls. Empty = show all. |
@@ -178,6 +179,7 @@ time_format: '24'
 forecast_type: daily
 forecast_layout: graph
 graph_color_by_temp: true
+graph_precip_bars: true
 forecast_days: 7
 visible_rows: 5
 show_forecast_precipitation: true
