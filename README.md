@@ -4,6 +4,10 @@
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
 [![GitHub Release](https://img.shields.io/github/v/release/korova-sq/sun-weather-card)](https://github.com/korova-sq/sun-weather-card/releases)
+[![GitHub Stars](https://img.shields.io/github/stars/korova-sq/sun-weather-card?style=flat)](https://github.com/korova-sq/sun-weather-card/stargazers)
+[![Downloads](https://img.shields.io/github/downloads/korova-sq/sun-weather-card/total?style=flat&label=downloads)](https://github.com/korova-sq/sun-weather-card/releases)
+[![Downloads@latest](https://img.shields.io/github/downloads/korova-sq/sun-weather-card/latest/total?style=flat&label=downloads%40latest)](https://github.com/korova-sq/sun-weather-card/releases/latest)
+[![GitHub Issues](https://img.shields.io/github/issues/korova-sq/sun-weather-card?style=flat)](https://github.com/korova-sq/sun-weather-card/issues)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-korova.sq-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/korova.sq)
 
@@ -75,6 +79,8 @@ The card automatically follows your Home Assistant theme — light or dark.
 ## Installation
 
 ### HACS (recommended)
+
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=korova-sq&repository=sun-weather-card&category=plugin)
 
 1. Go to **HACS → Frontend**.
 2. Open the menu (⋮) → **Custom repositories**.
