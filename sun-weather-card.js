@@ -105,6 +105,23 @@ const CONDITION_LABELS = {
     'windy-variant': 'Venteux et nuageux',
     exceptional: 'Exceptionnel',
   },
+  pl: {
+    'clear-night': 'Bezchmurna noc',
+    cloudy: 'Pochmurno',
+    fog: 'Mgła',
+    hail: 'Grad',
+    lightning: 'Burza',
+    'lightning-rainy': 'Burza z deszczem',
+    partlycloudy: 'Częściowe zachmurzenie',
+    pouring: 'Ulewny deszcz',
+    rainy: 'Deszczowo',
+    snowy: 'Opady śniegu',
+    'snowy-rainy': 'Deszcz ze śniegiem',
+    sunny: 'Słonecznie',
+    windy: 'Wietrznie',
+    'windy-variant': 'Wietrznie i pochmurno',
+    exceptional: 'Wyjątkowe warunki',
+  },
 };
 
 const UI_LABELS = {
@@ -113,6 +130,7 @@ const UI_LABELS = {
   de: { sunrise: 'Sonnenaufgang', sunset: 'Sonnenuntergang', daily: 'Tage', hourly: 'Stunden' },
   nl: { sunrise: 'zonsopgang', sunset: 'zonsondergang', daily: 'Dagen', hourly: 'Uren' },
   fr: { sunrise: 'lever', sunset: 'coucher', daily: 'Quotidien', hourly: 'Horaire' },
+  pl: { sunrise: 'wschód', sunset: 'zachód', daily: 'Dzienna', hourly: 'Godzinowa' },
 };
 
 class SunWeatherCard extends HTMLElement {
@@ -949,6 +967,7 @@ class SunWeatherCard extends HTMLElement {
     if (lang === 'de') return 'de-DE';
     if (lang === 'nl') return 'nl-NL';
     if (lang === 'fr') return 'fr-FR';
+    if (lang === 'pl') return 'pl-PL';
     // system: usa la lingua dell'utente HA, poi il browser, poi it-IT
     return (this._hass && this._hass.locale && this._hass.locale.language)
       || (this._hass && this._hass.language)
@@ -963,6 +982,7 @@ class SunWeatherCard extends HTMLElement {
       : loc.startsWith('de') ? CONDITION_LABELS.de
       : loc.startsWith('nl') ? CONDITION_LABELS.nl
       : loc.startsWith('fr') ? CONDITION_LABELS.fr
+      : loc.startsWith('pl') ? CONDITION_LABELS.pl
       : CONDITION_LABELS.en;
     return table[state] || state;
   }
@@ -974,6 +994,7 @@ class SunWeatherCard extends HTMLElement {
       : loc.startsWith('de') ? UI_LABELS.de
       : loc.startsWith('nl') ? UI_LABELS.nl
       : loc.startsWith('fr') ? UI_LABELS.fr
+      : loc.startsWith('pl') ? UI_LABELS.pl
       : UI_LABELS.en;
   }
 
@@ -2225,7 +2246,7 @@ const EDITOR_I18N = {
     appearance: 'Appearance',
     location: 'Location name (empty = automatic)',
     language: 'Language',
-    lang_system: 'System', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands', lang_fr: 'Français',
+    lang_system: 'System', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands', lang_fr: 'Français', lang_pl: 'Polski',
     time_format: 'Time format',
     tf_24: '24 hours', tf_12: '12 hours',
     show_time: 'Show time',
@@ -2290,7 +2311,7 @@ const EDITOR_I18N = {
     appearance: 'Aspetto',
     location: 'Nome località (vuoto = automatico)',
     language: 'Lingua',
-    lang_system: 'Sistema', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands', lang_fr: 'Français',
+    lang_system: 'Sistema', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands', lang_fr: 'Français', lang_pl: 'Polski',
     time_format: 'Formato ora',
     tf_24: '24 ore', tf_12: '12 ore',
     show_time: 'Mostra orario',
@@ -2355,7 +2376,7 @@ const EDITOR_I18N = {
     appearance: 'Darstellung',
     location: 'Ortsname (leer = automatisch)',
     language: 'Sprache',
-    lang_system: 'System', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands', lang_fr: 'Français',
+    lang_system: 'System', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands', lang_fr: 'Français', lang_pl: 'Polski',
     time_format: 'Zeitformat',
     tf_24: '24 Stunden', tf_12: '12 Stunden',
     show_time: 'Uhrzeit anzeigen',
@@ -2420,7 +2441,7 @@ const EDITOR_I18N = {
     appearance: 'Weergave',
     location: 'Locatienaam (leeg = automatisch)',
     language: 'Taal',
-    lang_system: 'Systeem', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands', lang_fr: 'Français',
+    lang_system: 'Systeem', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands', lang_fr: 'Français', lang_pl: 'Polski',
     time_format: 'Tijdnotatie',
     tf_24: '24 uur', tf_12: '12 uur',
     show_time: 'Tijd tonen',
@@ -2485,7 +2506,7 @@ const EDITOR_I18N = {
     appearance: 'Apparence',
     location: 'Nom du lieu (vide = automatique)',
     language: 'Langue',
-    lang_system: 'Système', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands', lang_fr: 'Français',
+    lang_system: 'Système', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands', lang_fr: 'Français', lang_pl: 'Polski',
     time_format: "Format de l'heure",
     tf_24: '24 heures', tf_12: '12 heures',
     show_time: "Afficher l'heure",
@@ -2543,6 +2564,71 @@ const EDITOR_I18N = {
     det_apparent_temperature: 'Température ressentie', det_cloud_coverage: 'Couverture nuageuse',
     det_uv_index: 'Indice UV', det_dew_point: 'Point de rosée',
   },
+  pl: {
+    entities: 'Encje',
+    weather_entity: 'Encja pogodowa',
+    sun_entity: 'Encja słońca (łuk wschodu/zachodu słońca)',
+    appearance: 'Wygląd',
+    location: 'Nazwa lokalizacji (puste = automatycznie)',
+    language: 'Język',
+    lang_system: 'System', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands', lang_fr: 'Français', lang_pl: 'Polski',
+    time_format: "Format czasu",
+    tf_24: '24 godziny', tf_12: '12 godzin',
+    show_time: "Pokaż godzinę",
+    show_date: 'Pokaż datę',
+    show_arc: "Pokaż łuk słońca",
+    animated_icons: 'Animowane ikony',
+    transparent: 'Przezroczyste tło',
+    background_image: 'Obraz tła (URL lub ścieżka /local/…)',
+    overlay: 'Nakładka: jaśniej ⟵ brak ⟶ ciemniej',
+    ov_lighter: 'Jaśniej', ov_zero: '0', ov_darker: 'Ciemniej',
+    forecast: 'Prognoza',
+    forecast_type: 'Typ prognozy',
+    ft_daily: 'Dzienna', ft_hourly: 'Godzinowa',
+    daily_layout: 'Układ prognozy dziennej',
+    dl_bars: 'Słupki', dl_graph: 'Wykres (linie)',
+    graph_color_by_temp: 'Koloruj linie wykresu według temperatury',
+    graph_precip_bars: 'Pokaż opady jako słupki na wykresie',
+    days_to_load: 'Liczba dni do wczytania',
+    hours_to_load: 'Liczba godzin do wczytania',
+    visible_rows: 'Widoczne dni (puste = wszystkie)',
+    show_rain: 'Pokaż dzienne opady deszczu (mm)',
+    show_toggle: 'Przełącznik Dni/Godziny na karcie',
+    details: 'Szczegóły',
+    details_hint: 'Dodaj atrybuty poniżej. Przeciągnij, aby zmienić kolejność. Naciśnij, aby usunąć.',
+    details_empty: 'Na razie brak szczegółów. Dodaj atrybuty poniżej.',
+    all_added: '— wszystko dodane —',
+    custom_sensors: 'Własne czujniki',
+    custom_sensors_hint: "Wyświetl dowolny czujnik w siatce szczegółów. Wybierz czujnik i opcjonalnie ustaw nazwę oraz ikonę.",
+    show_sensor_names: 'Pokaż nazwy pod czujnikami',
+    cs_fit_text: 'Dopasuj do tekstu',
+    add_sensor: 'Dodaj czujnik',
+    cs_entity: 'Encja czujnika',
+    cs_attribute: 'Atrybut (opcjonalnie)',
+    cs_pick: 'Wybierz czujnik…',
+    cs_name: 'Nazwa (opcjonalnie)',
+    cs_name_ph: 'np. Wiarygodność',
+    cs_icon: 'Ikona (opcjonalnie)',
+    cs_decimals: 'Miejsca po przecinku (opcjonalnie)',
+    cs_title: 'Czujnik',
+    cs_remove: 'Usuń',
+    cs_empty: 'Na razie brak własnych czujników.',
+    interaction: 'Interakcja',
+    tap_behavior: 'Działanie po kliknięciu',
+    hold_behavior: 'Działanie po przytrzymaniu',
+    double_tap_behavior: 'Działanie po dwukrotnym kliknięciu',
+    nav_path: 'Ścieżka nawigacji',
+    url_label: 'URL',
+    action_srv: 'Akcja (domain.service)',
+    act_more_info: "Informacje o encji", act_navigate: 'Przejdź', act_url: 'URL',
+    act_perform: "Wykonaj akcję", act_toggle: 'Przełącz', act_none: 'Nie rób nic',
+    det_humidity: 'Wilgotność', det_pressure: 'Ciśnienie', det_wind_speed: 'Prędkość wiatru',
+    det_wind_bearing: 'Kierunek wiatru', det_precipitation: 'Opady (mm)',
+    det_precipitation_probability: 'Prawdopodobieństwo opadów', det_sunrise: 'Wschód słońca',
+    det_sunset: 'Zachód słońca', det_visibility: 'Widoczność',
+    det_apparent_temperature: 'Temperatura odczuwalna', det_cloud_coverage: 'Zachmurzenie',
+    det_uv_index: 'Indeks UV', det_dew_point: 'Punkt rosy',
+  },
 };
 
 class SunWeatherCardEditor extends HTMLElement {
@@ -2583,6 +2669,7 @@ class SunWeatherCardEditor extends HTMLElement {
       : s.startsWith('de') ? 'de'
       : s.startsWith('nl') ? 'nl'
       : s.startsWith('fr') ? 'fr'
+      : s.startsWith('pl') ? 'pl'
       : 'en';
   }
 
@@ -2667,6 +2754,7 @@ class SunWeatherCardEditor extends HTMLElement {
         { value: 'de', label: this.t('lang_de') },
         { value: 'nl', label: this.t('lang_nl') },
         { value: 'fr', label: this.t('lang_fr') },
+        { value: 'pl', label: this.t('lang_pl') },
       ]) },
       { name: 'time_format', selector: sel([
         { value: '24', label: this.t('tf_24') },
