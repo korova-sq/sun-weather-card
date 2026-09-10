@@ -3,6 +3,23 @@
 All notable changes to this project are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.9.0]
+
+### Added
+- **Sun display style** — new `sun_style` option: show the sunrise/sunset as
+  a curved **arc** (default), a flat **bar**, or **none**. Replaces the old
+  `show_arc` toggle, which still works for backward compatibility
+  (`show_arc: false` behaves like `sun_style: none`).
+- **Sunrise/sunset countdown** — new `show_sun_countdown` option (default
+  off): shows a "sunset in …" / "sunrise in …" countdown next to the arc/bar.
+  Requested by JourMic.
+
+### Changed
+- Temperature colour scale now extends below −10 °C (down to −30 °C) with
+  darker shades of blue, so hard-frost days are distinguishable. Temperatures
+  from −10 °C up are unchanged. Requested by @JourMic.
+- Editor: the two precipitation toggles are now grouped together.
+
 ## [1.8.0]
 
 ### Performance

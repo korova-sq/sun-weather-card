@@ -1,7 +1,7 @@
 /**
  * Sun Weather Card
  * https://github.com/korova-sq/sun-weather-card
- * Version: 1.8.0
+ * Version: 1.9.0
  *
  * A weather card with an animated current-conditions header, a sunrise/sunset
  * arc, and daily/hourly forecasts shown as iOS-style bars or a line graph.
@@ -108,11 +108,11 @@ const CONDITION_LABELS = {
 };
 
 const UI_LABELS = {
-  it: { sunrise: 'alba', sunset: 'tramonto', daily: 'Giorni', hourly: 'Ore' },
-  en: { sunrise: 'sunrise', sunset: 'sunset', daily: 'Daily', hourly: 'Hourly' },
-  de: { sunrise: 'Sonnenaufgang', sunset: 'Sonnenuntergang', daily: 'Tage', hourly: 'Stunden' },
-  nl: { sunrise: 'zonsopgang', sunset: 'zonsondergang', daily: 'Dagen', hourly: 'Uren' },
-  fr: { sunrise: 'lever', sunset: 'coucher', daily: 'Quotidien', hourly: 'Horaire' },
+  it: { sunrise: 'alba', sunset: 'tramonto', daily: 'Giorni', hourly: 'Ore', sunset_in: 'Tramonto tra', sunrise_in: 'Alba tra', hm_join: ' e ' },
+  en: { sunrise: 'sunrise', sunset: 'sunset', daily: 'Daily', hourly: 'Hourly', sunset_in: 'Sunset in', sunrise_in: 'Sunrise in', hm_join: ' ' },
+  de: { sunrise: 'Sonnenaufgang', sunset: 'Sonnenuntergang', daily: 'Tage', hourly: 'Stunden', sunset_in: 'Sonnenuntergang in', sunrise_in: 'Sonnenaufgang in', hm_join: ' und ' },
+  nl: { sunrise: 'zonsopgang', sunset: 'zonsondergang', daily: 'Dagen', hourly: 'Uren', sunset_in: 'Zonsondergang over', sunrise_in: 'Zonsopgang over', hm_join: ' en ' },
+  fr: { sunrise: 'lever', sunset: 'coucher', daily: 'Quotidien', hourly: 'Horaire', sunset_in: 'Coucher du soleil dans', sunrise_in: 'Lever du soleil dans', hm_join: ' et ' },
 };
 
 class SunWeatherCard extends HTMLElement {
@@ -138,7 +138,11 @@ class SunWeatherCard extends HTMLElement {
       // mostra/nascondi le sezioni superiori
       show_time: true,
       show_date: true,
-      show_arc: true,
+      // stile visualizzazione sole: 'arc' | 'bar' | 'none' (default arc).
+      // Nessun default esplicito qui: lo risolve _sunStyle() per la retrocompat
+      // col vecchio toggle show_arc.
+      // countdown al prossimo alba/tramonto (default off)
+      show_sun_countdown: false,
       // azione al click sulla card (standard HA). Default: more-info entita' meteo
       tap_action: { action: 'more-info' },
       // layout previsioni giornaliere: 'bars' (righe con barre) o 'graph'
@@ -352,6 +356,21 @@ class SunWeatherCard extends HTMLElement {
           height: 66px;
           margin: 4px 0 20px;
         }
+        .arc-wrap.bar-mode {
+          height: 52px;
+          margin: 14px 0 14px;
+        }
+        .sun-bar-track {
+          stroke: color-mix(in srgb, var(--secondary-text-color, #888) 30%, transparent);
+          stroke-width: 3;
+          stroke-linecap: round;
+        }
+        .sun-bar-progress {
+          stroke: #e8b23a;
+          stroke-width: 3;
+          stroke-linecap: round;
+          opacity: 0.7;
+        }
         svg.arc { width: 100%; height: 100%; display: block; overflow: visible; }
         .arc-path {
           fill: none;
@@ -379,6 +398,11 @@ class SunWeatherCard extends HTMLElement {
           font-size: 10px;
           fill: var(--secondary-text-color);
           opacity: 0.8;
+        }
+        .sun-countdown {
+          font-size: 10px;
+          fill: var(--secondary-text-color);
+          opacity: 0.6;
         }
 
         /* --- Dettagli configurabili --- */
@@ -894,15 +918,15 @@ class SunWeatherCard extends HTMLElement {
     // mostra/nascondi ora, data, arco
     const showTime = cfg.show_time !== false;
     const showDate = cfg.show_date !== false;
-    const showArc = cfg.show_arc !== false;
+    const sunStyle = this._sunStyle(cfg);
     timeEl.style.display = showTime ? '' : 'none';
     dateEl.style.display = showDate ? '' : 'none';
     // nascondi l'intera riga header solo se sia ora sia data sono off
     if (headerEl) headerEl.style.display = (showTime || showDate) ? '' : 'none';
-    if (arcWrap) arcWrap.style.display = showArc ? '' : 'none';
+    if (arcWrap) arcWrap.style.display = (sunStyle !== 'none') ? '' : 'none';
 
     this._renderCurrent(now);
-    if (showArc) this._renderSunArc(now);
+    if (sunStyle !== 'none') this._renderSunArc(now);
     this._renderDetails();
     this._updateToggleUI();
     this._renderForecast();
@@ -1348,6 +1372,35 @@ class SunWeatherCard extends HTMLElement {
     return { sunrise, sunset };
   }
 
+  // Testo del countdown: di giorno "manca X al tramonto", di notte all'alba.
+  // Usa next_setting/next_rising del sun entity (sempre la prossima occorrenza).
+  _sunCountdownText() {
+    if (this._config.show_sun_countdown !== true) return '';
+    const sunState = this._hass && this._hass.states[this._config.sun_entity];
+    if (!sunState) return '';
+    const now = new Date();
+    const night = this._isNight(now);
+    const iso = night ? sunState.attributes.next_rising : sunState.attributes.next_setting;
+    if (!iso) return '';
+    let diffMin = Math.round((new Date(iso) - now) / 60000);
+    if (diffMin < 0) diffMin = 0;
+    const h = Math.floor(diffMin / 60);
+    const m = diffMin % 60;
+    const L = this._uiLabels();
+    const label = night ? L.sunrise_in : L.sunset_in;
+    const time = h > 0 ? `${h}h${L.hm_join}${m}m` : `${m}m`;
+    return `${label} ${time}`;
+  }
+
+  // stile visualizzazione sole risolto: 'arc' | 'bar' | 'none'.
+  // Retrocompatibile col vecchio toggle show_arc (false -> 'none').
+  _sunStyle(cfg) {
+    const c = cfg || this._config || {};
+    if (c.sun_style === 'arc' || c.sun_style === 'bar' || c.sun_style === 'none') return c.sun_style;
+    if (c.show_arc === false) return 'none';
+    return 'arc';
+  }
+
   _renderSunArc(now) {
     const svg = this.shadowRoot.getElementById('arc-svg');
     const sunState = this._hass.states[this._config.sun_entity];
@@ -1356,33 +1409,66 @@ class SunWeatherCard extends HTMLElement {
       return;
     }
 
+    const wrap = this.shadowRoot.querySelector('.arc-wrap');
+    const style = this._sunStyle();
+
     const { sunrise, sunset } = this._getTodaySunTimes(sunState, now);
     const total = sunset - sunrise;
     let fraction = total > 0 ? (now - sunrise) / total : 0;
     const isDaytime = fraction >= 0 && fraction <= 1;
     fraction = Math.min(1, Math.max(0, fraction));
 
-    // geometria arco: curva bezier quadratica che entra nell'orizzonte
-    // con angolo dolce (estremi "a punta") dentro viewBox 240 x 64
-    const cx = 120, cy = 46, rx = 100, peak = 34;
-    const x0 = cx - rx;      // punto alba (sinistra, sull'orizzonte)
-    const x2 = cx + rx;      // punto tramonto (destra, sull'orizzonte)
-    const ctrlY = cy - peak * 2; // punto di controllo: peak reale = meta'
-
-    // posizione del sole lungo la bezier al parametro t = frazione di giornata
-    const t = fraction;
-    const mt = 1 - t;
-    const sx = mt * mt * x0 + 2 * mt * t * cx + t * t * x2;
-    const sy = mt * mt * cy + 2 * mt * t * ctrlY + t * t * cy;
-
     const timeFmt = new Intl.DateTimeFormat(this._locale(), {
       hour: '2-digit',
       minute: '2-digit',
       hour12: this._config.time_format === '12',
     });
-
     const dotClass = isDaytime ? 'sun-dot' : 'moon-dot';
     const L = this._uiLabels();
+    const countdown = this._sunCountdownText();
+
+    const cx = 120, cy = 46, rx = 100, peak = 34;
+    const x0 = cx - rx;      // punto alba (sinistra)
+    const x2 = cx + rx;      // punto tramonto (destra)
+
+    // --- BARRA: versione minimale/piatta dell'arco (compatta) ---
+    if (style === 'bar') {
+      if (wrap) wrap.classList.add('bar-mode');
+      svg.setAttribute('viewBox', '0 0 240 52');
+      const lineY = 13;
+      const bx = x0 + fraction * (x2 - x0); // pallino sulla retta
+      const progress = isDaytime
+        ? `<line class="sun-bar-progress" x1="${x0}" y1="${lineY}" x2="${bx.toFixed(1)}" y2="${lineY}" />`
+        : '';
+      const cdBar = countdown
+        ? `<text class="sun-countdown" id="sun-countdown" x="${cx}" y="32" text-anchor="middle">${countdown}</text>`
+        : '';
+      svg.innerHTML = `
+        <line class="sun-bar-track" x1="${x0}" y1="${lineY}" x2="${x2}" y2="${lineY}" />
+        ${progress}
+        <circle class="${dotClass}" cx="${bx.toFixed(1)}" cy="${lineY}" r="6" />
+        <text class="sun-time-label" x="${x0}" y="32" text-anchor="middle">${timeFmt.format(sunrise)}</text>
+        <text class="sun-time-sub"   x="${x0}" y="43" text-anchor="middle">${L.sunrise}</text>
+        <text class="sun-time-label" x="${x2}" y="32" text-anchor="middle">${timeFmt.format(sunset)}</text>
+        <text class="sun-time-sub"   x="${x2}" y="43" text-anchor="middle">${L.sunset}</text>
+        ${cdBar}
+      `;
+      return;
+    }
+
+    // --- ARCO: curva bezier (come prima) ---
+    if (wrap) wrap.classList.remove('bar-mode');
+    svg.setAttribute('viewBox', '0 0 240 64');
+    const ctrlY = cy - peak * 2; // punto di controllo: peak reale = meta'
+    const t = fraction;
+    const mt = 1 - t;
+    const sx = mt * mt * x0 + 2 * mt * t * cx + t * t * x2;
+    const sy = mt * mt * cy + 2 * mt * t * ctrlY + t * t * cy;
+
+    // countdown al prossimo alba/tramonto, centrato tra i due orari (piu' tenue)
+    const countdownEl = countdown
+      ? `<text class="sun-countdown" id="sun-countdown" x="${cx}" y="${cy + 15}" text-anchor="middle">${countdown}</text>`
+      : '';
 
     svg.innerHTML = `
       <path class="arc-path" d="M ${x0} ${cy} Q ${cx} ${ctrlY} ${x2} ${cy}" />
@@ -1392,6 +1478,7 @@ class SunWeatherCard extends HTMLElement {
       <text class="sun-time-sub"   x="${x0}" y="${cy + 26}" text-anchor="middle">${L.sunrise}</text>
       <text class="sun-time-label" x="${x2}" y="${cy + 15}" text-anchor="middle">${timeFmt.format(sunset)}</text>
       <text class="sun-time-sub"   x="${x2}" y="${cy + 26}" text-anchor="middle">${L.sunset}</text>
+      ${countdownEl}
     `;
   }
 
@@ -1906,6 +1993,11 @@ class SunWeatherCard extends HTMLElement {
     if (t > 35) {
       const over = Math.min(t, 40) - 35;   // 0..5
       light = 55 - (over / 5) * 13;         // 55% -> 42%
+    } else if (t < -10) {
+      // sotto i -10°: stesso blu ma progressivamente piu' scuro fino a -30°,
+      // per distinguere i freddi intensi (climi rigidi) senza cambiare il resto
+      const under = -10 - Math.max(t, -30); // 0..20
+      light = 55 - (under / 20) * 20;        // 55% -> 35%
     }
     return `hsl(${hue}, 85%, ${light}%)`;
   }
@@ -2162,6 +2254,12 @@ class SunWeatherCard extends HTMLElement {
       }).format(now);
       if (dateEl.textContent !== d) dateEl.textContent = d;
     }
+    // countdown alba/tramonto: aggiorna il testo (scrive solo se cambia)
+    const cdEl = this.shadowRoot.getElementById('sun-countdown');
+    if (cdEl) {
+      const cd = this._sunCountdownText();
+      if (cdEl.textContent !== cd) cdEl.textContent = cd;
+    }
   }
 
   // quando la card viene rimossa dal DOM, smonta gli observer per non lasciarli
@@ -2231,6 +2329,9 @@ const EDITOR_I18N = {
     show_time: 'Show time',
     show_date: 'Show date',
     show_arc: 'Show sun arc',
+    sun_style: 'Sun display', ss_arc: 'Arc', ss_bar: 'Bar', ss_none: 'None',
+    sun_countdown: 'Sunrise/sunset countdown',
+    sunset_in: 'Sunset in', sunrise_in: 'Sunrise in', hm_join: ' ',
     animated_icons: 'Animated icons',
     transparent: 'Transparent background',
     background_image: 'Background image (URL or /local/… path)',
@@ -2296,6 +2397,9 @@ const EDITOR_I18N = {
     show_time: 'Mostra orario',
     show_date: 'Mostra data',
     show_arc: 'Mostra arco del sole',
+    sun_style: 'Visualizzazione sole', ss_arc: 'Arco', ss_bar: 'Barra', ss_none: 'Nessuno',
+    sun_countdown: 'Countdown alba/tramonto',
+    sunset_in: 'Tramonto tra', sunrise_in: 'Alba tra', hm_join: ' e ',
     animated_icons: 'Icone animate',
     transparent: 'Sfondo trasparente',
     background_image: 'Immagine di sfondo (URL o percorso /local/…)',
@@ -2361,6 +2465,9 @@ const EDITOR_I18N = {
     show_time: 'Uhrzeit anzeigen',
     show_date: 'Datum anzeigen',
     show_arc: 'Sonnenbogen anzeigen',
+    sun_style: 'Sonnen-Anzeige', ss_arc: 'Bogen', ss_bar: 'Balken', ss_none: 'Keine',
+    sun_countdown: 'Countdown Sonnenauf-/untergang',
+    sunset_in: 'Sonnenuntergang in', sunrise_in: 'Sonnenaufgang in', hm_join: ' und ',
     animated_icons: 'Animierte Symbole',
     transparent: 'Transparenter Hintergrund',
     background_image: 'Hintergrundbild (URL oder /local/…-Pfad)',
@@ -2426,6 +2533,9 @@ const EDITOR_I18N = {
     show_time: 'Tijd tonen',
     show_date: 'Datum tonen',
     show_arc: 'Zonneboog tonen',
+    sun_style: 'Zon-weergave', ss_arc: 'Boog', ss_bar: 'Balk', ss_none: 'Geen',
+    sun_countdown: 'Aftellen zonsopgang/-ondergang',
+    sunset_in: 'Zonsondergang over', sunrise_in: 'Zonsopgang over', hm_join: ' en ',
     animated_icons: 'Geanimeerde iconen',
     transparent: 'Transparante achtergrond',
     background_image: 'Achtergrondafbeelding (URL of /local/…-pad)',
@@ -2491,6 +2601,9 @@ const EDITOR_I18N = {
     show_time: "Afficher l'heure",
     show_date: 'Afficher la date',
     show_arc: "Afficher l'arc solaire",
+    sun_style: 'Affichage du soleil', ss_arc: 'Arc', ss_bar: 'Barre', ss_none: 'Aucun',
+    sun_countdown: 'Compte à rebours lever/coucher',
+    sunset_in: 'Coucher du soleil dans', sunrise_in: 'Lever du soleil dans', hm_join: ' et ',
     animated_icons: 'Icônes animées',
     transparent: 'Fond transparent',
     background_image: 'Image de fond (URL ou chemin /local/…)',
@@ -2652,7 +2765,8 @@ class SunWeatherCardEditor extends HTMLElement {
       time_format: c.time_format || '24',
       show_time: c.show_time !== false,
       show_date: c.show_date !== false,
-      show_arc: c.show_arc !== false,
+      sun_style: c.sun_style || (c.show_arc === false ? 'none' : 'arc'),
+      show_sun_countdown: c.show_sun_countdown === true,
       animated_icons: c.animated_icons !== false,
       transparent: c.transparent === true,
       background_image: c.background_image || '',
@@ -2674,7 +2788,12 @@ class SunWeatherCardEditor extends HTMLElement {
       ]) },
       { name: 'show_time', selector: { boolean: {} } },
       { name: 'show_date', selector: { boolean: {} } },
-      { name: 'show_arc', selector: { boolean: {} } },
+      { name: 'sun_style', selector: sel([
+        { value: 'arc', label: this.t('ss_arc') },
+        { value: 'bar', label: this.t('ss_bar') },
+        { value: 'none', label: this.t('ss_none') },
+      ]) },
+      { name: 'show_sun_countdown', selector: { boolean: {} } },
       { name: 'animated_icons', selector: { boolean: {} } },
       { name: 'transparent', selector: { boolean: {} } },
       { name: 'background_image', selector: { text: {} } },
@@ -2682,7 +2801,8 @@ class SunWeatherCardEditor extends HTMLElement {
     const labels = {
       location: this.t('location'), language: this.t('language'),
       time_format: this.t('time_format'), show_time: this.t('show_time'),
-      show_date: this.t('show_date'), show_arc: this.t('show_arc'),
+      show_date: this.t('show_date'), sun_style: this.t('sun_style'),
+      show_sun_countdown: this.t('sun_countdown'),
       animated_icons: this.t('animated_icons'), transparent: this.t('transparent'),
       background_image: this.t('background_image'),
     };
@@ -2690,11 +2810,15 @@ class SunWeatherCardEditor extends HTMLElement {
     form.addEventListener('value-changed', (e) => {
       const v = e.detail.value || {};
       Object.keys(labels).forEach((k) => {
-        if (k === 'show_time' || k === 'show_date' || k === 'show_arc' || k === 'animated_icons') {
+        if (k === 'show_time' || k === 'show_date' || k === 'animated_icons') {
           // toggle "attivo di default": salva solo se false
           if (v[k] === false) this._set(k, false); else this._set(k, undefined);
-        } else if (k === 'transparent') {
+        } else if (k === 'transparent' || k === 'show_sun_countdown') {
           if (v[k] === true) this._set(k, true); else this._set(k, undefined);
+        } else if (k === 'sun_style') {
+          // 'arc' e' il default -> non salvarlo; rimuovi il vecchio toggle show_arc
+          this._set('show_arc', undefined);
+          this._set('sun_style', (v.sun_style && v.sun_style !== 'arc') ? v.sun_style : undefined);
         } else {
           this._set(k, v[k]);
         }
@@ -2743,11 +2867,11 @@ class SunWeatherCardEditor extends HTMLElement {
         { value: 'graph', label: this.t('dl_graph') },
       ]) },
       { name: 'graph_color_by_temp', selector: { boolean: {} } },
-      { name: 'graph_precip_bars', selector: { boolean: {} } },
       { name: 'visible_rows', selector: num(1, 15) },
       { name: 'forecast_days', selector: num(1, 15) },
       { name: 'forecast_hours', selector: num(1, 48) },
       { name: 'show_forecast_precipitation', selector: { boolean: {} } },
+      { name: 'graph_precip_bars', selector: { boolean: {} } },
       { name: 'show_forecast_toggle', selector: { boolean: {} } },
     ];
     const labels = {
@@ -3224,7 +3348,7 @@ window.customCards.push({
 });
 
 console.info(
-  '%c SUN-WEATHER-CARD %c 1.8.0 ',
+  '%c SUN-WEATHER-CARD %c 1.9.0 ',
   'color: white; background: #ff7a59; font-weight: 700;',
   'color: #ff7a59; background: #1c1c1c; font-weight: 700;'
 );

@@ -49,7 +49,7 @@ Most weather cards on HACS show the forecast as a plain list. This card focuses 
 ## ✨ Features
 
 - 🌤️ **Current conditions header** – time, date, animated weather icon, current temperature, today's high/low and the location name.
-- 🌅 **Sunrise/sunset arc** – a light dotted arc with the sun (or moon at night) moving along it between sunrise and sunset.
+- 🌅 **Sunrise/sunset display** – shown as a curved **arc** or a flat **bar**, with the sun (or moon at night) moving between sunrise and sunset. Optional countdown to the next sunrise/sunset.
 - 📊 **Configurable details** – pick which attributes to show below the arc (humidity, pressure, wind, precipitation, UV, sunrise/sunset and more), shown as a tidy grid. Each attribute is shown only if your weather integration provides it.
 - 📅 **Daily & hourly forecast** – choose `daily` or `hourly`.
 - 📈 **Two layouts** – classic **bars** (iOS‑style temperature range bars) or a **graph** (smooth temperature line, with max/min lines for daily). In the graph, lines can optionally be colour‑coded by temperature and precipitation shown as bars.
@@ -58,7 +58,7 @@ Most weather cards on HACS show the forecast as a plain list. This card focuses 
 - 🔧 **Custom sensors** – add any entity (or a specific attribute of it, e.g. the sun's elevation or next dawn) to the details, with an optional name, icon and decimal rounding. Shown as a tidy 4‑column grid or a left‑aligned flow; names can be displayed under each value or on tap.
 - 🌍 **Multi‑language** – card content in Italian, English, German, Dutch or French, or follow your Home Assistant system language. The UI editor follows the card language.
 - 👆 **Tap / hold / double‑tap actions** – standard Home Assistant actions (more‑info, navigate, url, perform‑action, toggle).
-- 👁️ **Show only what you need** – time, date and the sun arc can each be turned on or off, and you choose exactly which detail attributes to display.
+- 👁️ **Show only what you need** – time, date and the sun display (arc/bar/none) can each be turned on or off, and you choose exactly which detail attributes to display.
 - 🛠 **Visual editor** – configure everything without touching YAML.
 
 ---
@@ -126,7 +126,8 @@ All options can be set from the visual editor or in YAML.
 | `time_format` | string | `24` | `24` or `12` hour clock. |
 | `show_time` | boolean | `true` | Show the clock. |
 | `show_date` | boolean | `true` | Show the date. |
-| `show_arc` | boolean | `true` | Show the sunrise/sunset arc. |
+| `sun_style` | string | `arc` | Sun display below the header: `arc` (curved path), `bar` (flat progress bar) or `none`. Replaces the old `show_arc` toggle (which still works: `show_arc: false` = `none`). |
+| `show_sun_countdown` | boolean | `false` | Show a "sunset in …/sunrise in …" countdown next to the sun arc/bar. |
 | `animated_icons` | boolean | `true` | Animate the weather icons. Set to `false` for static icons (lighter on slow devices). |
 | `transparent` | boolean | `false` | Transparent background — the card blends into the dashboard (no background, border or shadow). |
 | `background_image` | string | *none* | Background image URL or `/local/…` path. |
