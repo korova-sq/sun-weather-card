@@ -56,7 +56,7 @@ Most weather cards on HACS show the forecast as a plain list. This card focuses 
 - 🎨 **Original animated SVG icons** for sun, moon, clouds, rain, snow, fog, wind and lightning. No external assets — animations can be turned off for lower-end devices.
 - 🖼️ **Transparent or image background** – make the card blend into your dashboard, or set a background image with an adjustable light/dark overlay for readability.
 - 🔧 **Custom sensors** – add any entity (or a specific attribute of it, e.g. the sun's elevation or next dawn) to the details, with an optional name, icon and decimal rounding. Shown as a tidy 4‑column grid or a left‑aligned flow; names can be displayed under each value or on tap.
-- 🌍 **Multi‑language** – card content in Italian, English, German, Dutch or French, or follow your Home Assistant system language. The UI editor follows the card language.
+- 🌍 **Multi‑language** – card content in Italian, English, German, Dutch, French or Polish, or follow your Home Assistant system language. The UI editor follows the card language.
 - 👆 **Tap / hold / double‑tap actions** – standard Home Assistant actions (more‑info, navigate, url, perform‑action, toggle).
 - 👁️ **Show only what you need** – time, date and the sun display (arc/bar/none) can each be turned on or off, and you choose exactly which detail attributes to display.
 - 🛠 **Visual editor** – configure everything without touching YAML.
@@ -122,7 +122,7 @@ All options can be set from the visual editor or in YAML.
 | `entity` | string | **required** | Your `weather.*` entity. |
 | `sun_entity` | string | `sun.sun` | Sun entity used for the sunrise/sunset arc. |
 | `location` | string | *auto* | Location name shown under the condition. Empty = taken automatically. |
-| `language` | string | `system` | Card language: `system`, `it`, `en`, `de`, `nl` or `fr`. |
+| `language` | string | `system` | Card language: `system`, `it`, `en`, `de`, `nl`, `fr` or `pl`. |
 | `time_format` | string | `24` | `24` or `12` hour clock. |
 | `show_time` | boolean | `true` | Show the clock. |
 | `show_date` | boolean | `true` | Show the date. |

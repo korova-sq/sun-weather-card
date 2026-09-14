@@ -3,6 +3,17 @@
 All notable changes to this project are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.9.1]
+
+### Added
+- **Polish (pl) translation** — card and editor fully translated to Polish.
+  Thanks @EasYPLL for the contribution.
+
+### Changed
+- All translations are now grouped at the top of the file and centralised
+  (`SUPPORTED_LANGS`), so adding a language only means editing the translation
+  blocks — no other code changes. See `CONTRIBUTING.md`.
+
 ## [1.9.0]
 
 ### Added
