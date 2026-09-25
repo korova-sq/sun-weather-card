@@ -3,6 +3,22 @@
 All notable changes to this project are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.10.0]
+
+### Added
+- **Moon travels the arc at night** — the moon now moves along the arc (and
+  bar) from sunset to sunrise through the night, instead of staying parked at
+  one end. Thanks @PhilM4350 for spotting the discrepancy.
+- **Outdoor temperature sensor** (`current_temp_entity`) — point the card at
+  any sensor to use its reading as the current temperature, instead of the one
+  reported by the weather service. Useful when your local thermometer is more
+  accurate than the weather integration.
+- **Configurable decimal places** — two new options:
+  - `current_temp_decimals` (default `1`) — decimal places for the large
+    current-temperature number.
+  - `forecast_temp_decimals` (default `0`) — decimal places for forecast
+    temperatures (max/min labels and graph values).
+
 ## [1.9.1]
 
 ### Added

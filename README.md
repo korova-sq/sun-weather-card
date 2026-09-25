@@ -49,7 +49,7 @@ Most weather cards on HACS show the forecast as a plain list. This card focuses 
 ## ✨ Features
 
 - 🌤️ **Current conditions header** – time, date, animated weather icon, current temperature, today's high/low and the location name.
-- 🌅 **Sunrise/sunset display** – shown as a curved **arc** or a flat **bar**, with the sun (or moon at night) moving between sunrise and sunset. Optional countdown to the next sunrise/sunset.
+- 🌅 **Sunrise/sunset display** – shown as a curved **arc** or a flat **bar**, with the sun moving by day and the moon travelling the arc at night. Optional countdown to the next sunrise/sunset.
 - 📊 **Configurable details** – pick which attributes to show below the arc (humidity, pressure, wind, precipitation, UV, sunrise/sunset and more), shown as a tidy grid. Each attribute is shown only if your weather integration provides it.
 - 📅 **Daily & hourly forecast** – choose `daily` or `hourly`.
 - 📈 **Two layouts** – classic **bars** (iOS‑style temperature range bars) or a **graph** (smooth temperature line, with max/min lines for daily). In the graph, lines can optionally be colour‑coded by temperature and precipitation shown as bars.
@@ -128,6 +128,9 @@ All options can be set from the visual editor or in YAML.
 | `show_date` | boolean | `true` | Show the date. |
 | `sun_style` | string | `arc` | Sun display below the header: `arc` (curved path), `bar` (flat progress bar) or `none`. Replaces the old `show_arc` toggle (which still works: `show_arc: false` = `none`). |
 | `show_sun_countdown` | boolean | `false` | Show a "sunset in …/sunrise in …" countdown next to the sun arc/bar. |
+| `current_temp_entity` | string | — | Entity ID of an outdoor temperature sensor. When set, its reading replaces the weather temperature for the current-temperature display. |
+| `current_temp_decimals` | number | `1` | Decimal places for the current temperature (the large number). `0` = integer, `1` = one decimal. |
+| `forecast_temp_decimals` | number | `0` | Decimal places for forecast temperatures (max/min labels and graph). `0` = integer, `1` = one decimal. |
 | `animated_icons` | boolean | `true` | Animate the weather icons. Set to `false` for static icons (lighter on slow devices). |
 | `transparent` | boolean | `false` | Transparent background — the card blends into the dashboard (no background, border or shadow). |
 | `background_image` | string | *none* | Background image URL or `/local/…` path. |

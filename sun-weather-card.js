@@ -1,7 +1,7 @@
 /**
  * Sun Weather Card
  * https://github.com/korova-sq/sun-weather-card
- * Version: 1.9.1
+ * Version: 1.10.0
  *
  * A weather card with an animated current-conditions header, a sunrise/sunset
  * arc, and daily/hourly forecasts shown as iOS-style bars or a line graph.
@@ -189,8 +189,9 @@ class SunWeatherCard extends HTMLElement {
       // stile visualizzazione sole: 'arc' | 'bar' | 'none' (default arc).
       // Nessun default esplicito qui: lo risolve _sunStyle() per la retrocompat
       // col vecchio toggle show_arc.
-      // countdown al prossimo alba/tramonto (default off)
-      show_sun_countdown: false,
+      // decimali temperatura attuale (default 1); decimali previsioni (default 0)
+      current_temp_decimals: 1,
+      forecast_temp_decimals: 0,
       // azione al click sulla card (standard HA). Default: more-info entita' meteo
       tap_action: { action: 'more-info' },
       // layout previsioni giornaliere: 'bars' (righe con barre) o 'graph'
@@ -1065,6 +1066,29 @@ class SunWeatherCard extends HTMLElement {
     }
   }
 
+  // Temperatura attuale: dal sensore custom se configurato (current_temp_entity),
+  // altrimenti dall'attributo temperature del weather. Fallback silenzioso.
+  _currentTemp() {
+    const entity = this._config.current_temp_entity;
+    if (entity) {
+      const s = this._hass && this._hass.states[entity];
+      if (s) {
+        const v = parseFloat(s.state);
+        if (isFinite(v)) return v;
+      }
+    }
+    const wState = this._hass && this._hass.states[this._config.entity];
+    return wState ? wState.attributes.temperature : null;
+  }
+
+  // Formatta una temperatura delle previsioni con i decimali configurati.
+  // forecast_temp_decimals: 0 (default) = intero; 1 = un decimale.
+  _fmtForecastTemp(val) {
+    if (val == null) return '—';
+    const dec = this._config.forecast_temp_decimals === 1 ? 1 : 0;
+    return dec === 0 ? String(Math.round(val)) : val.toFixed(1);
+  }
+
   _renderCurrent(now) {
     const wState = this._hass.states[this._config.entity];
     if (!wState) return;
@@ -1079,11 +1103,11 @@ class SunWeatherCard extends HTMLElement {
       else if (condition === 'partlycloudy') condition = 'partlycloudy-night';
     }
 
-    const temp = wState.attributes.temperature;
+    const temp = this._currentTemp();
     const unit = wState.attributes.temperature_unit || '\u00b0';
 
     const numFmt = new Intl.NumberFormat(this._locale(), {
-      maximumFractionDigits: 1,
+      maximumFractionDigits: this._config.current_temp_decimals === 0 ? 0 : 1,
     });
 
     // localita': override manuale, poi nome entita' meteo, poi nome posizione HA
@@ -1104,7 +1128,7 @@ class SunWeatherCard extends HTMLElement {
         const hi = todayEntry.temperature;
         const lo = todayEntry.templow;
         if (hi != null && lo != null) {
-          hilo = `${numFmt.format(hi)}${unit} / ${numFmt.format(lo)}${unit}`;
+          hilo = `${this._fmtForecastTemp(hi)}${unit} / ${this._fmtForecastTemp(lo)}${unit}`;
         }
       }
     }
@@ -1438,6 +1462,21 @@ class SunWeatherCard extends HTMLElement {
     const isDaytime = fraction >= 0 && fraction <= 1;
     fraction = Math.min(1, Math.max(0, fraction));
 
+    // posizione lungo l'arco/barra: di giorno segue il sole (alba -> tramonto);
+    // di notte la luna percorre l'arco dal tramonto (destra) all'alba (sinistra),
+    // culminando in alto a mezzanotte. La finestra notturna va dal tramonto che
+    // ha iniziato la notte (next_setting - 24h) alla prossima alba (next_rising).
+    let posFraction = fraction;
+    if (!isDaytime) {
+      const DAY_MS = 24 * 60 * 60 * 1000;
+      const nightEnd = new Date(sunState.attributes.next_rising);
+      const nightStart = new Date(new Date(sunState.attributes.next_setting).getTime() - DAY_MS);
+      const nightTotal = nightEnd - nightStart;
+      let nf = nightTotal > 0 ? (now - nightStart) / nightTotal : 0;
+      nf = Math.min(1, Math.max(0, nf));
+      posFraction = 1 - nf; // notte: da destra (tramonto) a sinistra (alba)
+    }
+
     const timeFmt = new Intl.DateTimeFormat(this._locale(), {
       hour: '2-digit',
       minute: '2-digit',
@@ -1456,7 +1495,7 @@ class SunWeatherCard extends HTMLElement {
       if (wrap) wrap.classList.add('bar-mode');
       svg.setAttribute('viewBox', '0 0 240 52');
       const lineY = 13;
-      const bx = x0 + fraction * (x2 - x0); // pallino sulla retta
+      const bx = x0 + posFraction * (x2 - x0); // pallino sulla retta (sole/luna)
       const progress = isDaytime
         ? `<line class="sun-bar-progress" x1="${x0}" y1="${lineY}" x2="${bx.toFixed(1)}" y2="${lineY}" />`
         : '';
@@ -1480,7 +1519,7 @@ class SunWeatherCard extends HTMLElement {
     if (wrap) wrap.classList.remove('bar-mode');
     svg.setAttribute('viewBox', '0 0 240 64');
     const ctrlY = cy - peak * 2; // punto di controllo: peak reale = meta'
-    const t = fraction;
+    const t = posFraction;
     const mt = 1 - t;
     const sx = mt * mt * x0 + 2 * mt * t * cx + t * t * x2;
     const sy = mt * mt * cy + 2 * mt * t * ctrlY + t * t * cy;
@@ -1590,7 +1629,7 @@ class SunWeatherCard extends HTMLElement {
 
     // temperatura attuale dall'entita' weather, per il pallino su "oggi"
     const wState = this._hass.states[this._config.entity];
-    const currentTemp = wState?.attributes?.temperature;
+    const currentTemp = this._currentTemp();
     const precipUnit = wState?.attributes?.precipitation_unit || 'mm';
     const showPrecip = this._config.show_forecast_precipitation;
     const anyPrecip = showPrecip && days.some((d) => d.precipitation != null && d.precipitation > 0);
@@ -1642,13 +1681,13 @@ class SunWeatherCard extends HTMLElement {
           <div class="forecast-row${anyPrecip ? ' has-precip' : ''}">
             <div class="label">${label}</div>
             <div class="icon-wrap">${icon}</div>
-            <div class="temp-min">${Math.round(low)}\u00b0</div>
+            <div class="temp-min">${this._fmtForecastTemp(low)}\u00b0</div>
             <div class="bar-track">
               <div class="bar-fill" style="left:${leftPct}%; width:${widthPct}%; background:linear-gradient(to right, ${colorLow}, ${colorHigh});"></div>
               ${dotHtml}
             </div>
             <div class="temp-group">
-              <span class="temp-max">${Math.round(high)}\u00b0</span>
+              <span class="temp-max">${this._fmtForecastTemp(high)}\u00b0</span>
               ${precipHtml}
             </div>
           </div>
@@ -1706,7 +1745,7 @@ class SunWeatherCard extends HTMLElement {
             <div class="bar-track">
               <div class="bar-fill" style="left:0%; width:${widthPct}%; background:${color};"></div>
             </div>
-            <div class="temp-max">${Math.round(t)}\u00b0</div>
+            <div class="temp-max">${this._fmtForecastTemp(t)}\u00b0</div>
           </div>
         `;
       })
@@ -1915,13 +1954,13 @@ class SunWeatherCard extends HTMLElement {
 
     const maxLabels = days.map((d, i) => {
       const [px, py] = ptsMax[i];
-      return `<text class="g-tmax" x="${px}" y="${py - 9}" text-anchor="middle">${Math.round(d.temperature)}\u00b0</text>`;
+      return `<text class="g-tmax" x="${px}" y="${py - 9}" text-anchor="middle">${this._fmtForecastTemp(d.temperature)}\u00b0</text>`;
     }).join('');
 
     const minLabels = hourly ? '' : days.map((d, i) => {
       const [px, py] = ptsMin[i];
       const lo = d.templow != null ? d.templow : d.temperature;
-      return `<text class="g-tmin" x="${px}" y="${py + 17}" text-anchor="middle">${Math.round(lo)}\u00b0</text>`;
+      return `<text class="g-tmin" x="${px}" y="${py + 17}" text-anchor="middle">${this._fmtForecastTemp(lo)}\u00b0</text>`;
     }).join('');
 
     const precipLabels = !hasPrecipRow ? '' : (precipBars
@@ -2340,6 +2379,7 @@ const EDITOR_I18N = {
     entities: 'Entities',
     weather_entity: 'Weather entity',
     sun_entity: 'Sun entity (sunrise/sunset arc)',
+    current_temp_entity: 'Current temperature — outdoor sensor (optional)',
     appearance: 'Appearance',
     location: 'Location name (empty = automatic)',
     language: 'Language',
@@ -2351,6 +2391,7 @@ const EDITOR_I18N = {
     show_arc: 'Show sun arc',
     sun_style: 'Sun display', ss_arc: 'Arc', ss_bar: 'Bar', ss_none: 'None',
     sun_countdown: 'Sunrise/sunset countdown',
+    current_temp_decimals: 'Current temperature decimals', ctd_0: 'Integer (17°)', ctd_1: 'One decimal (16.5°)',
     animated_icons: 'Animated icons',
     transparent: 'Transparent background',
     background_image: 'Background image (URL or /local/… path)',
@@ -2361,6 +2402,7 @@ const EDITOR_I18N = {
     ft_daily: 'Daily', ft_hourly: 'Hourly',
     daily_layout: 'Daily layout',
     dl_bars: 'Bars', dl_graph: 'Graph (lines)',
+    forecast_temp_decimals: 'Forecast temperature decimals', ftd_0: 'Integers (22°)', ftd_1: 'One decimal (22.4°)',
     graph_color_by_temp: 'Colour graph lines by temperature',
     graph_precip_bars: 'Show precipitation as bars in the graph',
     days_to_load: 'Days to load',
@@ -2407,6 +2449,7 @@ const EDITOR_I18N = {
     entities: 'Entità',
     weather_entity: 'Entità meteo',
     sun_entity: 'Entità sole (arco alba/tramonto)',
+    current_temp_entity: 'Temperatura attuale — sensore esterno (opzionale)',
     appearance: 'Aspetto',
     location: 'Nome località (vuoto = automatico)',
     language: 'Lingua',
@@ -2418,6 +2461,7 @@ const EDITOR_I18N = {
     show_arc: 'Mostra arco del sole',
     sun_style: 'Visualizzazione sole', ss_arc: 'Arco', ss_bar: 'Barra', ss_none: 'Nessuno',
     sun_countdown: 'Countdown alba/tramonto',
+    current_temp_decimals: 'Decimali temperatura attuale', ctd_0: 'Intero (17°)', ctd_1: 'Un decimale (16,5°)',
     animated_icons: 'Icone animate',
     transparent: 'Sfondo trasparente',
     background_image: 'Immagine di sfondo (URL o percorso /local/…)',
@@ -2428,6 +2472,7 @@ const EDITOR_I18N = {
     ft_daily: 'Giornaliera', ft_hourly: 'Oraria',
     daily_layout: 'Layout giornaliero',
     dl_bars: 'Barre', dl_graph: 'Grafico (linee)',
+    forecast_temp_decimals: 'Decimali temperature previsioni', ftd_0: 'Interi (22°)', ftd_1: 'Un decimale (22.4°)',
     graph_color_by_temp: 'Colora le linee del grafico per temperatura',
     graph_precip_bars: 'Mostra le precipitazioni come barre nel grafico',
     days_to_load: 'Giorni da caricare',
@@ -2474,6 +2519,7 @@ const EDITOR_I18N = {
     entities: 'Entitäten',
     weather_entity: 'Wetter-Entität',
     sun_entity: 'Sonnen-Entität (Sonnenauf-/-untergangsbogen)',
+    current_temp_entity: 'Aktuelle Temperatur — Außensensor (optional)',
     appearance: 'Darstellung',
     location: 'Ortsname (leer = automatisch)',
     language: 'Sprache',
@@ -2485,6 +2531,7 @@ const EDITOR_I18N = {
     show_arc: 'Sonnenbogen anzeigen',
     sun_style: 'Sonnen-Anzeige', ss_arc: 'Bogen', ss_bar: 'Balken', ss_none: 'Keine',
     sun_countdown: 'Countdown Sonnenauf-/untergang',
+    current_temp_decimals: 'Aktuelle Temperatur Dezimalstellen', ctd_0: 'Ganzzahl (17°)', ctd_1: 'Eine Dezimalstelle (16,5°)',
     animated_icons: 'Animierte Symbole',
     transparent: 'Transparenter Hintergrund',
     background_image: 'Hintergrundbild (URL oder /local/…-Pfad)',
@@ -2495,6 +2542,7 @@ const EDITOR_I18N = {
     ft_daily: 'Täglich', ft_hourly: 'Stündlich',
     daily_layout: 'Tages-Layout',
     dl_bars: 'Balken', dl_graph: 'Diagramm (Linien)',
+    forecast_temp_decimals: 'Nachkommastellen Vorhersagetemperatur', ftd_0: 'Ganzzahl (22°)', ftd_1: 'Eine Dezimalstelle (22,4°)',
     graph_color_by_temp: 'Diagrammlinien nach Temperatur einfärben',
     graph_precip_bars: 'Niederschlag als Balken im Diagramm anzeigen',
     days_to_load: 'Zu ladende Tage',
@@ -2541,6 +2589,7 @@ const EDITOR_I18N = {
     entities: 'Entiteiten',
     weather_entity: 'Weer-entiteit',
     sun_entity: 'Zon-entiteit (zonsopgang/-ondergang boog)',
+    current_temp_entity: 'Huidige temperatuur — buitensensor (optioneel)',
     appearance: 'Weergave',
     location: 'Locatienaam (leeg = automatisch)',
     language: 'Taal',
@@ -2552,6 +2601,7 @@ const EDITOR_I18N = {
     show_arc: 'Zonneboog tonen',
     sun_style: 'Zon-weergave', ss_arc: 'Boog', ss_bar: 'Balk', ss_none: 'Geen',
     sun_countdown: 'Aftellen zonsopgang/-ondergang',
+    current_temp_decimals: 'Decimalen huidige temperatuur', ctd_0: 'Geheel (17°)', ctd_1: 'Één decimaal (16,5°)',
     animated_icons: 'Geanimeerde iconen',
     transparent: 'Transparante achtergrond',
     background_image: 'Achtergrondafbeelding (URL of /local/…-pad)',
@@ -2562,6 +2612,7 @@ const EDITOR_I18N = {
     ft_daily: 'Dagelijks', ft_hourly: 'Uurlijks',
     daily_layout: 'Dagelijkse layout',
     dl_bars: 'Balken', dl_graph: 'Grafiek (lijnen)',
+    forecast_temp_decimals: 'Decimalen voorspellingstemperatuur', ftd_0: 'Geheel (22°)', ftd_1: 'Één decimaal (22,4°)',
     graph_color_by_temp: 'Grafieklijnen kleuren op temperatuur',
     graph_precip_bars: 'Neerslag als balken in de grafiek tonen',
     days_to_load: 'Te laden dagen',
@@ -2608,6 +2659,7 @@ const EDITOR_I18N = {
     entities: 'Entités',
     weather_entity: 'Entité météorologique',
     sun_entity: 'Entité solaire (arc du lever/coucher du soleil)',
+    current_temp_entity: 'Température actuelle — capteur extérieur (optionnel)',
     appearance: 'Apparence',
     location: 'Nom du lieu (vide = automatique)',
     language: 'Langue',
@@ -2619,6 +2671,7 @@ const EDITOR_I18N = {
     show_arc: "Afficher l'arc solaire",
     sun_style: 'Affichage du soleil', ss_arc: 'Arc', ss_bar: 'Barre', ss_none: 'Aucun',
     sun_countdown: 'Compte à rebours lever/coucher',
+    current_temp_decimals: 'Décimales température actuelle', ctd_0: 'Entier (17°)', ctd_1: 'Une décimale (16,5°)',
     animated_icons: 'Icônes animées',
     transparent: 'Fond transparent',
     background_image: 'Image de fond (URL ou chemin /local/…)',
@@ -2629,6 +2682,7 @@ const EDITOR_I18N = {
     ft_daily: 'Quotidienne', ft_hourly: 'Horaire',
     daily_layout: 'Disposition quotidienne',
     dl_bars: 'Barres', dl_graph: 'Graphique (lignes)',
+    forecast_temp_decimals: 'Décimales des températures de prévision', ftd_0: 'Entier (22°)', ftd_1: 'Une décimale (22,4°)',
     graph_color_by_temp: 'Colorer les lignes du graphique selon la température',
     graph_precip_bars: 'Afficher les précipitations en barres dans le graphique',
     days_to_load: 'Jours à charger',
@@ -2675,6 +2729,7 @@ const EDITOR_I18N = {
     entities: 'Encje',
     weather_entity: 'Encja pogodowa',
     sun_entity: 'Encja słońca (łuk wschodu/zachodu słońca)',
+    current_temp_entity: 'Aktualna temperatura — czujnik zewnętrzny (opcjonalnie)',
     appearance: 'Wygląd',
     location: 'Nazwa lokalizacji (puste = automatycznie)',
     language: 'Język',
@@ -2686,6 +2741,7 @@ const EDITOR_I18N = {
     show_arc: 'Pokaż łuk słońca',
     sun_style: 'Wyświetlanie słońca', ss_arc: 'Łuk', ss_bar: 'Pasek', ss_none: 'Brak',
     sun_countdown: 'Odliczanie do wschodu/zachodu',
+    current_temp_decimals: 'Miejsca dziesiętne aktualnej temperatury', ctd_0: 'Całkowita (17°)', ctd_1: 'Jeden dziesiętny (16,5°)',
     animated_icons: 'Animowane ikony',
     transparent: 'Przezroczyste tło',
     background_image: 'Obraz tła (URL lub ścieżka /local/…)',
@@ -2696,6 +2752,7 @@ const EDITOR_I18N = {
     ft_daily: 'Dzienna', ft_hourly: 'Godzinowa',
     daily_layout: 'Układ prognozy dziennej',
     dl_bars: 'Słupki', dl_graph: 'Wykres (linie)',
+    forecast_temp_decimals: 'Dziesiętne temperatury prognozy', ftd_0: 'Całkowite (22°)', ftd_1: 'Jeden dziesiętny (22,4°)',
     graph_color_by_temp: 'Koloruj linie wykresu według temperatury',
     graph_precip_bars: 'Pokaż opady jako słupki na wykresie',
     days_to_load: 'Liczba dni do wczytania',
@@ -2812,17 +2869,22 @@ class SunWeatherCardEditor extends HTMLElement {
     form.data = {
       entity: this._config.entity || '',
       sun_entity: this._config.sun_entity || 'sun.sun',
+      current_temp_entity: this._config.current_temp_entity || '',
     };
     form.schema = [
       { name: 'entity', selector: { entity: { domain: 'weather' } } },
       { name: 'sun_entity', selector: { entity: { domain: 'sun' } } },
+      { name: 'current_temp_entity', selector: { entity: { domain: ['sensor', 'weather', 'input_number'] } } },
     ];
     form.computeLabel = (s) =>
-      s.name === 'entity' ? this.t('weather_entity') : this.t('sun_entity');
+      s.name === 'entity' ? this.t('weather_entity')
+      : s.name === 'sun_entity' ? this.t('sun_entity')
+      : this.t('current_temp_entity');
     form.addEventListener('value-changed', (e) => {
       const v = e.detail.value || {};
       this._set('entity', v.entity);
       this._set('sun_entity', v.sun_entity);
+      this._set('current_temp_entity', v.current_temp_entity || undefined);
     });
     mount.appendChild(form);
     mount.dataset.filled = '1';
@@ -2844,6 +2906,7 @@ class SunWeatherCardEditor extends HTMLElement {
       show_date: c.show_date !== false,
       sun_style: c.sun_style || (c.show_arc === false ? 'none' : 'arc'),
       show_sun_countdown: c.show_sun_countdown === true,
+      current_temp_decimals: c.current_temp_decimals ?? 1,
       animated_icons: c.animated_icons !== false,
       transparent: c.transparent === true,
       background_image: c.background_image || '',
@@ -2872,6 +2935,10 @@ class SunWeatherCardEditor extends HTMLElement {
         { value: 'none', label: this.t('ss_none') },
       ]) },
       { name: 'show_sun_countdown', selector: { boolean: {} } },
+      { name: 'current_temp_decimals', selector: sel([
+        { value: 0, label: this.t('ctd_0') },
+        { value: 1, label: this.t('ctd_1') },
+      ]) },
       { name: 'animated_icons', selector: { boolean: {} } },
       { name: 'transparent', selector: { boolean: {} } },
       { name: 'background_image', selector: { text: {} } },
@@ -2881,6 +2948,7 @@ class SunWeatherCardEditor extends HTMLElement {
       time_format: this.t('time_format'), show_time: this.t('show_time'),
       show_date: this.t('show_date'), sun_style: this.t('sun_style'),
       show_sun_countdown: this.t('sun_countdown'),
+      current_temp_decimals: this.t('current_temp_decimals'),
       animated_icons: this.t('animated_icons'), transparent: this.t('transparent'),
       background_image: this.t('background_image'),
     };
@@ -2893,6 +2961,8 @@ class SunWeatherCardEditor extends HTMLElement {
           if (v[k] === false) this._set(k, false); else this._set(k, undefined);
         } else if (k === 'transparent' || k === 'show_sun_countdown') {
           if (v[k] === true) this._set(k, true); else this._set(k, undefined);
+        } else if (k === 'current_temp_decimals') {
+          this._set(k, v[k] === 0 ? 0 : undefined); // 1 è default, non serve salvarlo
         } else if (k === 'sun_style') {
           // 'arc' e' il default -> non salvarlo; rimuovi il vecchio toggle show_arc
           this._set('show_arc', undefined);
@@ -2925,6 +2995,7 @@ class SunWeatherCardEditor extends HTMLElement {
     form.data = {
       forecast_type: c.forecast_type || 'daily',
       forecast_layout: c.forecast_layout || 'bars',
+      forecast_temp_decimals: c.forecast_temp_decimals ?? 0,
       graph_color_by_temp: c.graph_color_by_temp === true,
       graph_precip_bars: c.graph_precip_bars === true,
       forecast_days: c.forecast_days ?? 7,
@@ -2944,6 +3015,10 @@ class SunWeatherCardEditor extends HTMLElement {
         { value: 'bars', label: this.t('dl_bars') },
         { value: 'graph', label: this.t('dl_graph') },
       ]) },
+      { name: 'forecast_temp_decimals', selector: sel([
+        { value: 0, label: this.t('ftd_0') },
+        { value: 1, label: this.t('ftd_1') },
+      ]) },
       { name: 'graph_color_by_temp', selector: { boolean: {} } },
       { name: 'visible_rows', selector: num(1, 15) },
       { name: 'forecast_days', selector: num(1, 15) },
@@ -2954,6 +3029,7 @@ class SunWeatherCardEditor extends HTMLElement {
     ];
     const labels = {
       forecast_type: this.t('forecast_type'), forecast_layout: this.t('daily_layout'),
+      forecast_temp_decimals: this.t('forecast_temp_decimals'),
       graph_color_by_temp: this.t('graph_color_by_temp'),
       graph_precip_bars: this.t('graph_precip_bars'),
       forecast_days: this.t('days_to_load'), forecast_hours: this.t('hours_to_load'),
@@ -2966,6 +3042,7 @@ class SunWeatherCardEditor extends HTMLElement {
       const v = e.detail.value || {};
       this._set('forecast_type', v.forecast_type);
       this._set('forecast_layout', v.forecast_layout);
+      this._set('forecast_temp_decimals', v.forecast_temp_decimals === 1 ? 1 : undefined);
       // graph_color_by_temp e' spento di default: salva solo se true
       this._set('graph_color_by_temp', v.graph_color_by_temp === true ? true : undefined);
       this._set('graph_precip_bars', v.graph_precip_bars === true ? true : undefined);
@@ -3426,7 +3503,7 @@ window.customCards.push({
 });
 
 console.info(
-  '%c SUN-WEATHER-CARD %c 1.9.1 ',
+  '%c SUN-WEATHER-CARD %c 1.10.0 ',
   'color: white; background: #ff7a59; font-weight: 700;',
   'color: #ff7a59; background: #1c1c1c; font-weight: 700;'
 );
