@@ -156,7 +156,21 @@ All options can be set from the visual editor or in YAML.
 
 Add any of these to the `details` list, in the order you want them shown. An item appears only if your integration provides that value.
 
-`humidity`, `pressure`, `wind_speed`, `wind_bearing`, `precipitation`, `precipitation_probability`, `sunrise`, `sunset`, `visibility`, `apparent_temperature`, `cloud_coverage`, `uv_index`, `dew_point`
+`humidity`, `pressure`, `wind_speed`, `wind_bearing`, `wind`, `precipitation`, `precipitation_probability`, `sunrise`, `sunset`, `visibility`, `apparent_temperature`, `cloud_coverage`, `uv_index`, `dew_point`
+
+`wind` is a combined slot that shows speed and direction together (e.g. `6 km/h (E)`) — a compact alternative to listing `wind_speed` and `wind_bearing` separately.
+
+For numeric attributes you can optionally round the displayed value by writing the item as an object:
+
+```yaml
+details:
+  - humidity
+  - attribute: pressure
+    decimals: 1
+  - wind
+```
+
+The visual editor exposes a decimal field automatically for each numeric attribute.
 
 ### Custom sensors
 

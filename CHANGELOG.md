@@ -3,6 +3,34 @@
 All notable changes to this project are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.11.0]
+
+### Added
+- **Wind slot** — new `wind` item for the `details` list: shows wind speed and
+  direction combined in a single cell (e.g. `6 km/h (E)`). A convenient
+  replacement for separate `wind_speed` and `wind_bearing` entries when
+  screen space is tight. Requested by Dave (HA community forum).
+- **Decimal rounding for detail attributes** — each item in the `details` list
+  can now be written as `{attribute: humidity, decimals: 2}` to round that
+  attribute's value to the given number of decimal places. The visual editor
+  shows expandable cards with a decimals field for each numeric attribute;
+  non-numeric items (sunrise, sunset, wind direction) appear as plain rows.
+  Requested by Dave (HA community forum).
+
+### Fixed
+- Current-condition label now uses the day/night-corrected condition instead of
+  the raw state from the weather integration. Integrations that still report
+  `clear-night` after sunrise (before their next update cycle) no longer show
+  the wrong condition text. Thanks @MisteurZZ (#13).
+- `partlycloudy-night` translation was missing from all six languages — it is
+  now correctly translated everywhere.
+
+### Changed
+- Details editor: items now display as expandable cards with a decimals field;
+  each card has up/down arrows and a trash button to reorder and remove.
+- Custom sensors editor: up/down arrows and a trash button added — consistent
+  with the detail attributes editor.
+
 ## [1.10.0]
 
 ### Added

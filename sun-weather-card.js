@@ -1,7 +1,7 @@
 /**
  * Sun Weather Card
  * https://github.com/korova-sq/sun-weather-card
- * Version: 1.10.0
+ * Version: 1.11.0
  *
  * A weather card with an animated current-conditions header, a sunrise/sunset
  * arc, and daily/hourly forecasts shown as iOS-style bars or a line graph.
@@ -42,6 +42,7 @@ function langCode(loc) {
 const CONDITION_LABELS = {
   it: {
     'clear-night': 'Sereno',
+    'partlycloudy-night': 'Parzialmente Nuvoloso',
     cloudy: 'Nuvoloso',
     fog: 'Nebbia',
     hail: 'Grandine',
@@ -59,6 +60,7 @@ const CONDITION_LABELS = {
   },
   en: {
     'clear-night': 'Clear',
+    'partlycloudy-night': 'Partly Cloudy',
     cloudy: 'Cloudy',
     fog: 'Fog',
     hail: 'Hail',
@@ -76,6 +78,7 @@ const CONDITION_LABELS = {
   },
   de: {
     'clear-night': 'Klar',
+    'partlycloudy-night': 'Teilweise bewölkt',
     cloudy: 'Bewölkt',
     fog: 'Nebel',
     hail: 'Hagel',
@@ -93,6 +96,7 @@ const CONDITION_LABELS = {
   },
   nl: {
     'clear-night': 'Helder',
+    'partlycloudy-night': 'Gedeeltelijk bewolkt',
     cloudy: 'Bewolkt',
     fog: 'Mist',
     hail: 'Hagel',
@@ -110,6 +114,7 @@ const CONDITION_LABELS = {
   },
   fr: {
     'clear-night': 'Nuit claire',
+    'partlycloudy-night': 'Partiellement nuageux',
     cloudy: 'Nuageux',
     fog: 'Brouillard',
     hail: 'Grêle',
@@ -127,6 +132,7 @@ const CONDITION_LABELS = {
   },
   pl: {
     'clear-night': 'Bezchmurna noc',
+    'partlycloudy-night': 'Częściowe zachmurzenie',
     cloudy: 'Pochmurno',
     fog: 'Mgła',
     hail: 'Grad',
@@ -541,6 +547,9 @@ class SunWeatherCard extends HTMLElement {
         }
         .detail-item .d-val {
           white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          min-width: 0;
         }
 
         /* --- Previsioni --- */
@@ -1007,9 +1016,15 @@ class SunWeatherCard extends HTMLElement {
   // per le condizioni che mostrano il sole (sereno / parz. nuvoloso). Le altre e
   // quelle già notturne restano invariate.
   _nightCondition(condition, datetime) {
-    if (!this._isNightAt(new Date(datetime))) return condition;
-    if (condition === 'sunny') return 'clear-night';
-    if (condition === 'partlycloudy') return 'partlycloudy-night';
+    if (this._isNightAt(new Date(datetime))) {
+      // condizioni diurne -> varianti notturne
+      if (condition === 'sunny') return 'clear-night';
+      if (condition === 'partlycloudy') return 'partlycloudy-night';
+    } else {
+      // conversione inversa: condizioni notturne durante ore diurne
+      if (condition === 'clear-night') return 'sunny';
+      if (condition === 'partlycloudy-night') return 'partlycloudy';
+    }
     return condition;
   }
 
@@ -1099,8 +1114,12 @@ class SunWeatherCard extends HTMLElement {
     // di notte, e senza questo l'icona principale mostrerebbe il sole di notte
     const night = this._isNight(now);
     if (night) {
+      // integrazioni lente a cambiare: sunny/partlycloudy di notte -> varianti notturne
       if (condition === 'sunny') condition = 'clear-night';
       else if (condition === 'partlycloudy') condition = 'partlycloudy-night';
+    } else {
+      // conversione inversa: clear-night di giorno -> sunny (meteo ancora al passo precedente)
+      if (condition === 'clear-night') condition = 'sunny';
     }
 
     const temp = this._currentTemp();
@@ -1146,7 +1165,9 @@ class SunWeatherCard extends HTMLElement {
         this._icon(condition, this._iconUid, 68);
     }
     const descEl = this.shadowRoot.getElementById('cur-desc');
-    descEl.textContent = this._conditionLabel(wState.state);
+    // usa la condizione gia' corretta per giorno/notte (non lo stato raw del meteo)
+    // cosi' icona e testo restano sempre coerenti
+    descEl.textContent = this._conditionLabel(condition);
     this._fitConditionText(descEl);
     this.shadowRoot.getElementById('cur-location').textContent = location;
     this.shadowRoot.getElementById('cur-temp').textContent =
@@ -1195,6 +1216,21 @@ class SunWeatherCard extends HTMLElement {
     return dirs[Math.round(deg / 22.5) % 16];
   }
 
+  // Normalizza il formato della lista details: accetta sia stringhe ('pressure')
+  // sia oggetti ({attribute:'pressure', decimals:2}). Restituisce sempre oggetti.
+  _normalizeDetails() {
+    return (this._config.details || []).map((d) =>
+      typeof d === 'string' ? { attribute: d, decimals: 0 } : d
+    );
+  }
+
+  // Formatta un valore numerico con i decimali configurati per quell'attributo.
+  _fmtDetailVal(val, decimals) {
+    if (val == null) return null;
+    const d = typeof decimals === 'number' && decimals > 0 ? decimals : 0;
+    return d === 0 ? String(Math.round(val)) : Number(val).toFixed(d);
+  }
+
   _renderDetails() {
     const box = this.shadowRoot.getElementById('details');
     if (!box) return;
@@ -1211,7 +1247,7 @@ class SunWeatherCard extends HTMLElement {
       ) || this._daily[0];
     }
 
-    const round = (v) => Math.round(v);
+    const round = (v, dec) => this._fmtDetailVal(v, dec ?? 0);
 
     // orari alba/tramonto (per i dettagli sunrise/sunset)
     let sunriseStr = null, sunsetStr = null;
@@ -1246,6 +1282,18 @@ class SunWeatherCard extends HTMLElement {
       wind_speed: {
         icon: 'mdi:weather-windy',
         val: a.wind_speed != null ? `${round(a.wind_speed)} ${a.wind_speed_unit || 'km/h'}` : null,
+      },
+      // slot combinato: velocita' + direzione in un unico elemento
+      wind: {
+        icon: 'mdi:weather-windy',
+        val: (() => {
+          const spd = a.wind_speed != null ? `${round(a.wind_speed)} ${a.wind_speed_unit || 'km/h'}` : null;
+          const dir = a.wind_bearing != null
+            ? (typeof a.wind_bearing === 'number' ? this._bearingToText(a.wind_bearing) : a.wind_bearing)
+            : null;
+          if (spd && dir) return `${spd} (${dir})`;
+          return spd || dir || null;
+        })(),
       },
       wind_bearing: {
         icon: 'mdi:compass-outline',
@@ -1295,14 +1343,35 @@ class SunWeatherCard extends HTMLElement {
       },
     };
 
-    const stdItems = (this._config.details || [])
-      .map((key) => {
-        const def = defs[key];
+    const stdItems = this._normalizeDetails()
+      .map(({ attribute: key, decimals }) => {
+        // ricostruisce defs con i decimali configurati per questo attributo
+        const defsWithDec = {
+          ...defs,
+          humidity:     { ...defs.humidity,     val: a.humidity != null ? `${round(a.humidity, decimals)} %` : null },
+          pressure:     { ...defs.pressure,     val: a.pressure != null ? `${round(a.pressure, decimals)} ${a.pressure_unit || 'hPa'}` : null },
+          wind_speed:   { ...defs.wind_speed,   val: a.wind_speed != null ? `${round(a.wind_speed, decimals)} ${a.wind_speed_unit || 'km/h'}` : null },
+          precipitation: { ...defs.precipitation, val: (() => {
+            let p = null;
+            if (a.precipitation != null) p = a.precipitation;
+            else if (today && today.precipitation != null) p = today.precipitation;
+            const unit = a.precipitation_unit || 'mm';
+            return p != null ? `${round(p, decimals)} ${unit}` : null;
+          })() },
+          precipitation_probability: { ...defs.precipitation_probability, val: a.precipitation_probability != null ? `${round(a.precipitation_probability, decimals)} %` : null },
+          visibility:   { ...defs.visibility,   val: a.visibility != null ? `${round(a.visibility, decimals)} ${a.visibility_unit || 'km'}` : null },
+          apparent_temperature: { ...defs.apparent_temperature, val: a.apparent_temperature != null ? `${round(a.apparent_temperature, decimals)}${a.temperature_unit || '°'}` : null },
+          cloud_coverage: { ...defs.cloud_coverage, val: a.cloud_coverage != null ? `${round(a.cloud_coverage, decimals)} %` : null },
+          uv_index:     { ...defs.uv_index,     val: a.uv_index != null ? `${round(a.uv_index, decimals)}` : null },
+          dew_point:    { ...defs.dew_point,    val: a.dew_point != null ? `${round(a.dew_point, decimals)}${a.temperature_unit || '°'}` : null },
+        };
+        const def = defsWithDec[key];
         if (!def || def.val == null) return '';
         const rot = def.rotate != null
           ? ` style="transform: rotate(${def.rotate}deg);"` : '';
+        const wide = key === 'wind' ? ' detail-item--wide' : '';
         return `
-          <div class="detail-item">
+          <div class="detail-item${wide}">
             <ha-icon icon="${def.icon}"${rot}></ha-icon>
             <span class="d-val">${def.val}</span>
           </div>`;
@@ -2361,6 +2430,7 @@ const ALL_DETAILS = [
   ['pressure', 'Pressure'],
   ['wind_speed', 'Wind speed'],
   ['wind_bearing', 'Wind direction'],
+  ['wind', 'Wind (speed + direction)'],
   ['precipitation', 'Precipitation (mm)'],
   ['precipitation_probability', 'Precip. probability'],
   ['sunrise', 'Sunrise'],
@@ -2372,6 +2442,15 @@ const ALL_DETAILS = [
   ['dew_point', 'Dew point'],
 ];
 const DETAIL_LABELS = Object.fromEntries(ALL_DETAILS);
+const DETAIL_ICONS = {
+  humidity: 'mdi:water-percent', pressure: 'mdi:gauge',
+  wind_speed: 'mdi:weather-windy', wind_bearing: 'mdi:compass-outline',
+  wind: 'mdi:weather-windy', precipitation: 'mdi:weather-rainy',
+  precipitation_probability: 'mdi:weather-pouring', sunrise: 'mdi:weather-sunset-up',
+  sunset: 'mdi:weather-sunset-down', visibility: 'mdi:eye-outline',
+  apparent_temperature: 'mdi:thermometer', cloud_coverage: 'mdi:cloud-percent-outline',
+  uv_index: 'mdi:weather-sunny-alert', dew_point: 'mdi:water-thermometer-outline',
+};
 
 // Traduzioni dell'editor (it/en). L'editor segue la lingua di Home Assistant.
 const EDITOR_I18N = {
@@ -2411,7 +2490,7 @@ const EDITOR_I18N = {
     show_rain: 'Show daily rain (mm)',
     show_toggle: 'Daily/Hourly toggle in card',
     details: 'Details',
-    details_hint: 'Add attributes below. Drag the chips to reorder. Tap ✕ to remove.',
+    details_hint: 'Add attributes to the detail grid. Use ▲▼ to reorder, the bin to remove.',
     custom_sensors: 'Custom sensors',
     custom_sensors_hint: 'Show any sensor entity in the details grid. Pick a sensor and optionally set a name and icon.',
     show_sensor_names: 'Show names under sensors',
@@ -2439,7 +2518,7 @@ const EDITOR_I18N = {
     act_more_info: 'Entity info', act_navigate: 'Navigate', act_url: 'URL',
     act_perform: 'Perform action', act_toggle: 'Toggle', act_none: 'Nothing',
     det_humidity: 'Humidity', det_pressure: 'Pressure', det_wind_speed: 'Wind speed',
-    det_wind_bearing: 'Wind direction', det_precipitation: 'Precipitation (mm)',
+    det_wind_bearing: 'Wind direction', det_wind: 'Wind (speed + direction)', det_precipitation: 'Precipitation (mm)',
     det_precipitation_probability: 'Precip. probability', det_sunrise: 'Sunrise',
     det_sunset: 'Sunset', det_visibility: 'Visibility',
     det_apparent_temperature: 'Apparent temp.', det_cloud_coverage: 'Cloud coverage',
@@ -2481,7 +2560,7 @@ const EDITOR_I18N = {
     show_rain: 'Mostra pioggia giornaliera (mm)',
     show_toggle: 'Interruttore Giorni/Ore nella card',
     details: 'Dettagli',
-    details_hint: 'Aggiungi attributi qui sotto. Trascina i chip per riordinare. Tocca ✕ per rimuovere.',
+    details_hint: 'Aggiungi attributi alla griglia. Usa ▲▼ per riordinare, il cestino per rimuovere.',
     custom_sensors: 'Sensori personalizzati',
     custom_sensors_hint: 'Mostra qualsiasi entità sensore nella griglia dei dettagli. Scegli un sensore e, se vuoi, imposta nome e icona.',
     show_sensor_names: 'Mostra i nomi sotto i sensori',
@@ -2509,7 +2588,7 @@ const EDITOR_I18N = {
     act_more_info: 'Info entità', act_navigate: 'Naviga', act_url: 'URL',
     act_perform: 'Esegui azione', act_toggle: 'Commuta', act_none: 'Niente',
     det_humidity: 'Umidità', det_pressure: 'Pressione', det_wind_speed: 'Velocità vento',
-    det_wind_bearing: 'Direzione vento', det_precipitation: 'Precipitazioni (mm)',
+    det_wind_bearing: 'Direzione vento', det_wind: 'Vento (velocità + direzione)', det_precipitation: 'Precipitazioni (mm)',
     det_precipitation_probability: 'Prob. precipitazioni', det_sunrise: 'Alba',
     det_sunset: 'Tramonto', det_visibility: 'Visibilità',
     det_apparent_temperature: 'Temp. percepita', det_cloud_coverage: 'Copertura nuvolosa',
@@ -2551,7 +2630,7 @@ const EDITOR_I18N = {
     show_rain: 'Tagesregen anzeigen (mm)',
     show_toggle: 'Umschalter Tage/Stunden in der Karte',
     details: 'Details',
-    details_hint: 'Attribute unten hinzufügen. Chips zum Umsortieren ziehen. Zum Entfernen ✕ tippen.',
+    details_hint: 'Attribute zur Detailraster hinzufügen. ▲▼ zum Umsortieren, Mülleimer zum Entfernen.',
     custom_sensors: 'Eigene Sensoren',
     custom_sensors_hint: 'Zeige eine beliebige Sensor-Entität im Detailraster. Sensor wählen und optional Name und Symbol setzen.',
     show_sensor_names: 'Namen unter den Sensoren anzeigen',
@@ -2579,7 +2658,7 @@ const EDITOR_I18N = {
     act_more_info: 'Entitäts-Info', act_navigate: 'Navigieren', act_url: 'URL',
     act_perform: 'Aktion ausführen', act_toggle: 'Umschalten', act_none: 'Nichts',
     det_humidity: 'Luftfeuchtigkeit', det_pressure: 'Luftdruck', det_wind_speed: 'Windgeschwindigkeit',
-    det_wind_bearing: 'Windrichtung', det_precipitation: 'Niederschlag (mm)',
+    det_wind_bearing: 'Windrichtung', det_wind: 'Wind (Geschwindigkeit + Richtung)', det_precipitation: 'Niederschlag (mm)',
     det_precipitation_probability: 'Niederschlagswahrsch.', det_sunrise: 'Sonnenaufgang',
     det_sunset: 'Sonnenuntergang', det_visibility: 'Sichtweite',
     det_apparent_temperature: 'Gefühlte Temp.', det_cloud_coverage: 'Bewölkung',
@@ -2621,7 +2700,7 @@ const EDITOR_I18N = {
     show_rain: 'Dagelijkse neerslag tonen (mm)',
     show_toggle: 'Dagen/Uren-schakelaar in kaart',
     details: 'Details',
-    details_hint: 'Voeg hieronder attributen toe. Sleep om te herordenen. Tik om te verwijderen.',
+    details_hint: 'Voeg attributen toe aan het detailraster. ▲▼ om te sorteren, prullenbak om te verwijderen.',
     details_empty: 'Nog geen details. Voeg hieronder attributen toe.',
     all_added: '— alle toegevoegd —',
     custom_sensors: 'Aangepaste sensoren',
@@ -2649,7 +2728,7 @@ const EDITOR_I18N = {
     act_more_info: 'Entiteit-info', act_navigate: 'Navigeren', act_url: 'URL',
     act_perform: 'Actie uitvoeren', act_toggle: 'Omschakelen', act_none: 'Niets',
     det_humidity: 'Luchtvochtigheid', det_pressure: 'Luchtdruk', det_wind_speed: 'Windsnelheid',
-    det_wind_bearing: 'Windrichting', det_precipitation: 'Neerslag (mm)',
+    det_wind_bearing: 'Windrichting', det_wind: 'Wind (snelheid + richting)', det_precipitation: 'Neerslag (mm)',
     det_precipitation_probability: 'Kans op neerslag', det_sunrise: 'Zonsopgang',
     det_sunset: 'Zonsondergang', det_visibility: 'Zicht',
     det_apparent_temperature: 'Gevoelstemperatuur', det_cloud_coverage: 'Bewolking',
@@ -2691,7 +2770,7 @@ const EDITOR_I18N = {
     show_rain: 'Afficher la pluie quotidienne (mm)',
     show_toggle: 'Bascule Jours/Heures dans la carte',
     details: 'Détails',
-    details_hint: 'Ajoutez des attributs ci-dessous. Faites glisser pour réorganiser. Appuyez pour supprimer.',
+    details_hint: 'Ajoutez des attributs à la grille. ▲▼ pour réorganiser, poubelle pour supprimer.',
     details_empty: 'Aucun détail pour le moment. Ajoutez les attributs ci-dessous.',
     all_added: '— tout ajouté —',
     custom_sensors: 'Capteurs personnalisés',
@@ -2719,7 +2798,7 @@ const EDITOR_I18N = {
     act_more_info: "Informations sur l'entité", act_navigate: 'Naviguer', act_url: 'URL',
     act_perform: "Effectuer l'action", act_toggle: 'Basculer', act_none: 'Ne rien faire',
     det_humidity: 'Humidité', det_pressure: 'Pression', det_wind_speed: 'Vitesse du vent',
-    det_wind_bearing: 'Direction du vent', det_precipitation: 'Précipitation (mm)',
+    det_wind_bearing: 'Direction du vent', det_wind: 'Vent (vitesse + direction)', det_precipitation: 'Précipitation (mm)',
     det_precipitation_probability: 'Probabilité de précipitation', det_sunrise: 'Lever du soleil',
     det_sunset: 'Coucher du soleil', det_visibility: 'Visibilité',
     det_apparent_temperature: 'Température ressentie', det_cloud_coverage: 'Couverture nuageuse',
@@ -2761,7 +2840,7 @@ const EDITOR_I18N = {
     show_rain: 'Pokaż dzienne opady deszczu (mm)',
     show_toggle: 'Przełącznik Dni/Godziny na karcie',
     details: 'Szczegóły',
-    details_hint: 'Dodaj atrybuty poniżej. Przeciągnij, aby zmienić kolejność. Naciśnij, aby usunąć.',
+    details_hint: 'Dodaj atrybuty do siatki. ▲▼ aby zmienić kolejność, kosz aby usunąć.',
     details_empty: 'Na razie brak szczegółów. Dodaj atrybuty poniżej.',
     all_added: '— wszystko dodane —',
     custom_sensors: 'Własne czujniki',
@@ -2789,7 +2868,7 @@ const EDITOR_I18N = {
     act_more_info: 'Informacje o encji', act_navigate: 'Przejdź', act_url: 'URL',
     act_perform: 'Wykonaj akcję', act_toggle: 'Przełącz', act_none: 'Nie rób nic',
     det_humidity: 'Wilgotność', det_pressure: 'Ciśnienie', det_wind_speed: 'Prędkość wiatru',
-    det_wind_bearing: 'Kierunek wiatru', det_precipitation: 'Opady (mm)',
+    det_wind_bearing: 'Kierunek wiatru', det_wind: 'Wiatr (prędkość + kierunek)', det_precipitation: 'Opady (mm)',
     det_precipitation_probability: 'Prawdopodobieństwo opadów', det_sunrise: 'Wschód słońca',
     det_sunset: 'Zachód słońca', det_visibility: 'Widoczność',
     det_apparent_temperature: 'Temperatura odczuwalna', det_cloud_coverage: 'Zachmurzenie',
@@ -3097,29 +3176,130 @@ class SunWeatherCardEditor extends HTMLElement {
     if (!this.shadowRoot) return;
     const mount = this.shadowRoot.getElementById('details-form');
     if (!mount || mount.dataset.filled) return;
+    mount.innerHTML = '';
 
-    const form = document.createElement('ha-form');
-    form.hass = this._hass;
-    form.data = { details: this._config.details || [] };
-    // selettore nativo multi-scelta e riordinabile (drag&drop nativo di HA)
-    form.schema = [{
-      name: 'details',
-      selector: {
-        select: {
-          multiple: true,
-          reorder: true,
-          mode: 'list',
-          options: ALL_DETAILS.map(([k]) => ({ value: k, label: this._detailLabel(k) })),
-        },
-      },
-    }];
-    form.computeLabel = () => '';
-    form.addEventListener('value-changed', (e) => {
-      const v = e.detail.value || {};
-      this._set('details', Array.isArray(v.details) ? v.details : []);
-    });
-    mount.appendChild(form);
+    // normalizza inline (stessa logica di _normalizeDetails nella card)
+    const details = (this._config.details || []).map((d) =>
+      typeof d === 'string' ? { attribute: d, decimals: 0 } : d
+    );
+    try { this._fillDetailsFormInner(mount, details); }
+    catch(e) { console.error('SWC _fillDetailsForm error:', e); mount.textContent = 'Error: ' + e.message; }
     mount.dataset.filled = '1';
+  }
+
+  _fillDetailsFormInner(mount, details) {
+    const numericAttrs = new Set(['humidity','pressure','wind_speed','wind',
+      'precipitation','precipitation_probability','visibility','apparent_temperature',
+      'cloud_coverage','uv_index','dew_point']);
+    const usedKeys = new Set(details.map((d) => d.attribute));
+    const available = ALL_DETAILS.filter(([k]) => !usedKeys.has(k));
+
+    const save = (list) => {
+      this._set('details', list.length ? list : []);
+      const m = this.shadowRoot && this.shadowRoot.getElementById('details-form');
+      if (m) { m.dataset.filled = ''; m.innerHTML = ''; }
+      this._fillDetailsForm();
+    };
+
+    // una ha-form expandable per ogni attributo aggiunto
+    details.forEach((item, i) => {
+      const row = document.createElement('div');
+      row.className = 'custom-row';
+
+      const form = document.createElement('ha-form');
+      form.hass = this._hass;
+      form.data = { decimals: item.decimals ?? 0 };
+
+      const isNum = numericAttrs.has(item.attribute);
+
+      if (isNum) {
+        // attributi numerici: pannello espandibile con campo decimali
+        form.data = { decimals: item.decimals ?? 0 };
+        form.schema = [{
+          type: 'expandable',
+          name: '',
+          title: this._detailLabel(item.attribute),
+          icon: DETAIL_ICONS[item.attribute] || 'mdi:format-list-bulleted',
+          expanded: i === this._openDetailIndex,
+          schema: [{ name: 'decimals', selector: { number: { min: 0, max: 6, step: 1, mode: 'box' } } }],
+        }];
+        form.computeLabel = (s) => s.name === 'decimals' ? this.t('cs_decimals') : s.name;
+        form.addEventListener('value-changed', (e) => {
+          const v = e.detail.value || {};
+          const dec = Math.min(6, Math.max(0, parseInt(v.decimals) || 0));
+          const l = [...details];
+          l[i] = { attribute: item.attribute, decimals: dec };
+          this._set('details', l);
+        });
+      } else {
+        // attributi non numerici (alba, tramonto, direzione vento):
+        // riga statica senza pannello espandibile (niente freccia, niente panel vuoto)
+        const staticDiv = document.createElement('div');
+        staticDiv.style.cssText = 'display:flex;align-items:center;gap:10px;padding:12px 16px;' +
+          'border:1px solid var(--divider-color,#e0e0e0);border-radius:8px;flex:1';
+        const ico = document.createElement('ha-icon');
+        ico.setAttribute('icon', DETAIL_ICONS[item.attribute] || 'mdi:format-list-bulleted');
+        ico.style.color = 'var(--secondary-text-color)';
+        const lbl = document.createElement('span');
+        lbl.textContent = this._detailLabel(item.attribute);
+        lbl.style.flex = '1';
+        staticDiv.append(ico, lbl);
+        row.appendChild(staticDiv);
+      }
+
+      // riga controlli: ▲ ▼ + Rimuovi allineati a destra (identico ai sensori personalizzati)
+      const ctrlRow = document.createElement('div');
+      ctrlRow.style.cssText = 'display:flex;justify-content:flex-end;align-items:center;gap:8px';
+
+      const mkArrow = (label, disabled, fn) => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.textContent = label;
+        b.style.cssText = 'border:none;background:none;cursor:pointer;font-size:1em;padding:2px 4px;color:var(--primary-text-color)';
+        if (disabled) { b.disabled = true; b.style.opacity = '0.3'; }
+        b.addEventListener('click', fn);
+        return b;
+      };
+
+      ctrlRow.append(
+        mkArrow('▲', i === 0, () => { const l=[...details]; [l[i-1],l[i]]=[l[i],l[i-1]]; save(l); }),
+        mkArrow('▼', i === details.length-1, () => { const l=[...details]; [l[i],l[i+1]]=[l[i+1],l[i]]; save(l); }),
+        this._trashBtn(() => save(details.filter((_,j)=>j!==i))),
+      );
+
+      if (isNum) row.append(form, ctrlRow);
+      else row.appendChild(ctrlRow);
+      mount.appendChild(row);
+    });
+
+    // ha-form per aggiungere un attributo (select nativa di HA)
+    if (available.length) {
+      const addWrap = document.createElement('div');
+      addWrap.style.marginTop = '8px';
+      const addForm = document.createElement('ha-form');
+      addForm.hass = this._hass;
+      addForm.data = { attribute: '' };
+      addForm.schema = [{
+        name: 'attribute',
+        selector: {
+          select: {
+            mode: 'dropdown',
+            options: [
+              { value: '', label: `＋ ${this.t('add_sensor').replace('＋ ', '')}…` },
+              ...available.map(([k]) => ({ value: k, label: this._detailLabel(k) })),
+            ],
+          },
+        },
+      }];
+      addForm.computeLabel = () => '';
+      addForm.addEventListener('value-changed', (e) => {
+        const v = (e.detail.value || {}).attribute;
+        if (!v) return;
+        addForm.data = { attribute: '' };
+        save([...details, { attribute: v, decimals: 0 }]);
+      });
+      addWrap.appendChild(addForm);
+      mount.appendChild(addWrap);
+    }
   }
 
   _render() {
@@ -3147,6 +3327,12 @@ class SunWeatherCardEditor extends HTMLElement {
         .grp-body { display: flex; flex-direction: column; gap: 12px; padding: 4px 2px 2px; }
         .row { display: flex; flex-direction: column; gap: 4px; }
         .row.inline { flex-direction: row; align-items: center; justify-content: space-between; gap: 10px; }
+        .cs-card { border: 1px solid var(--divider-color,#e0e0e0); border-radius: 8px; margin-bottom: 6px; overflow: hidden; }
+        .cs-header { display: flex; align-items: center; padding: 6px 8px; gap: 4px; background: var(--secondary-background-color, #f5f5f5); }
+        .cs-title { flex: 1; font-weight: 600; font-size: 0.9em; color: var(--primary-text-color); }
+        .cs-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; }
+        .cs-add-row { margin-top: 8px; }
+        .cs-add-row select { width: 100%; }
         label { font-size: 0.9em; color: var(--secondary-text-color); }
         select, input[type="number"], input[type="text"] {
           padding: 8px; border-radius: 6px;
@@ -3438,14 +3624,26 @@ class SunWeatherCardEditor extends HTMLElement {
         }
       });
 
-      const rm = document.createElement('button');
-      rm.type = 'button';
-      rm.className = 'cs-remove';
-      rm.textContent = `\u2715 ${this.t('cs_remove')}`;
-      rm.addEventListener('click', () => this._removeCustom(i));
+      const ctrlRow = document.createElement('div');
+      ctrlRow.style.cssText = 'display:flex;justify-content:flex-end;align-items:center;gap:8px';
+
+      const mkArrow = (label, disabled, fn) => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.textContent = label;
+        b.style.cssText = 'border:none;background:none;cursor:pointer;font-size:1em;padding:2px 4px;color:var(--primary-text-color)';
+        if (disabled) { b.disabled = true; b.style.opacity = '0.3'; }
+        b.addEventListener('click', fn);
+        return b;
+      };
+
+      ctrlRow.append(
+        mkArrow('▲', i === 0, () => this._moveCustom(i, -1)),
+        mkArrow('▼', i === items.length - 1, () => this._moveCustom(i, 1)),
+        this._trashBtn(() => this._removeCustom(i)),
+      );
 
       row.appendChild(form);
-      row.appendChild(rm);
+      row.appendChild(ctrlRow);
       list.appendChild(row);
     });
   }
@@ -3481,6 +3679,27 @@ class SunWeatherCardEditor extends HTMLElement {
     else arr[index][key] = value;
     this._config.custom_details = arr;
     this._emit();
+  }
+
+  _trashBtn(onClick) {
+    const btn = document.createElement('ha-icon-button');
+    btn.label = 'Remove';
+    const icon = document.createElement('ha-icon');
+    icon.setAttribute('icon', 'mdi:delete');
+    btn.appendChild(icon);
+    btn.addEventListener('click', onClick);
+    return btn;
+  }
+
+  _moveCustom(index, dir) {
+    const arr = [...(this._config.custom_details || [])];
+    const target = index + dir;
+    if (target < 0 || target >= arr.length) return;
+    [arr[index], arr[target]] = [arr[target], arr[index]];
+    this._config.custom_details = arr;
+    this._emit();
+    this._openCustomIndex = target;
+    this._renderCustomEditor();
   }
 
   _removeCustom(index) {
