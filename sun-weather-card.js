@@ -1,7 +1,7 @@
 /**
  * Sun Weather Card
  * https://github.com/korova-sq/sun-weather-card
- * Version: 1.11.0
+ * Version: 1.11.1
  *
  * A weather card with an animated current-conditions header, a sunrise/sunset
  * arc, and daily/hourly forecasts shown as iOS-style bars or a line graph.
@@ -1251,6 +1251,18 @@ class SunWeatherCard extends HTMLElement {
     return d === 0 ? String(Math.round(val)) : Number(val).toFixed(d);
   }
 
+  // Escape anti-XSS per ogni valore proveniente da hass.states prima di inserirlo
+  // in innerHTML: stati/attributi di entita' arbitrarie possono contenere testo
+  // esterno (titoli RSS, eventi calendario, API cloud) con markup.
+  _esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   _renderDetails() {
     const box = this.shadowRoot.getElementById('details');
     if (!box) return;
@@ -1393,7 +1405,7 @@ class SunWeatherCard extends HTMLElement {
         return `
           <div class="detail-item${wide}">
             <ha-icon icon="${def.icon}"${rot}></ha-icon>
-            <span class="d-val">${def.val}</span>
+            <span class="d-val">${this._esc(def.val)}</span>
           </div>`;
       });
 
@@ -1427,7 +1439,7 @@ class SunWeatherCard extends HTMLElement {
           }
           const val = `${this._fmtValue(raw, c.decimals)}${unit ? ' ' + unit : ''}`;
           // icona davvero opzionale: se il campo e' vuoto non si mostra nulla
-          const iconHtml = c.icon ? `<ha-icon icon="${c.icon}"></ha-icon>` : '';
+          const iconHtml = c.icon ? `<ha-icon icon="${this._esc(c.icon)}"></ha-icon>` : '';
           // etichetta sotto il valore: nome opzionale se c'e', altrimenti
           // friendly name + attributo (reso leggibile), cosi' due voci sulla
           // stessa entita' con attributi diversi non escono uguali
@@ -1443,15 +1455,16 @@ class SunWeatherCard extends HTMLElement {
               name = friendly;
             }
           }
-          const nameHtml = showNames ? `<span class="cd-name">${name}</span>` : '';
+          const nameEsc = this._esc(name);
+          const nameHtml = showNames ? `<span class="cd-name">${nameEsc}</span>` : '';
           // il tooltip al tocco serve solo quando i nomi NON sono mostrati sotto
-          const tipAttrs = showNames ? '' : ` title="${name}" data-name="${name}"`;
+          const tipAttrs = showNames ? '' : ` title="${nameEsc}" data-name="${nameEsc}"`;
           const tipClass = showNames ? '' : ' has-tip';
           return `
             <div class="custom-item${tipClass}"${tipAttrs}>
               <div class="cd-row">
                 ${iconHtml}
-                <span class="d-val">${val}</span>
+                <span class="d-val">${this._esc(val)}</span>
               </div>
               ${nameHtml}
             </div>`;
@@ -1719,7 +1732,7 @@ class SunWeatherCard extends HTMLElement {
     // temperatura attuale dall'entita' weather, per il pallino su "oggi"
     const wState = this._hass.states[this._config.entity];
     const currentTemp = this._currentTemp();
-    const precipUnit = wState?.attributes?.precipitation_unit || 'mm';
+    const precipUnit = this._esc(wState?.attributes?.precipitation_unit || 'mm');
     const showPrecip = this._config.show_forecast_precipitation;
     const anyPrecip = showPrecip && days.some((d) => d.precipitation != null && d.precipitation > 0);
     const todayStr = new Date().toDateString();
@@ -1901,7 +1914,7 @@ class SunWeatherCard extends HTMLElement {
       : dayFmt.format(new Date(d.datetime));
 
     const wState = this._hass.states[this._config.entity];
-    const precipUnit = wState?.attributes?.precipitation_unit || 'mm';
+    const precipUnit = this._esc(wState?.attributes?.precipitation_unit || 'mm');
     const showPrecip = this._config.show_forecast_precipitation && !hourly;
 
     const highs = days.map((d) => d.temperature).filter((v) => v != null);

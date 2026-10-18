@@ -3,6 +3,20 @@
 All notable changes to this project are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.11.1]
+
+### Security
+- Values coming from Home Assistant entity states — custom sensor states and
+  attributes, units of measurement, friendly names and the wind-direction
+  string — are now HTML-escaped before being inserted into the card. This
+  prevents markup carried by an entity's value (feed titles, calendar
+  summaries, messages, cloud-API strings) from being injected into the
+  dashboard of anyone who opens it. Thanks to @frenck for the report.
+
+### Added
+- **Swedish (sv) translation** — card and editor fully translated to Swedish.
+  Thanks @lassemanjansson-web for the contribution.
+
 ## [1.11.0]
 
 ### Added
