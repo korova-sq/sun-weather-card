@@ -1,7 +1,7 @@
 /**
  * Sun Weather Card
  * https://github.com/korova-sq/sun-weather-card
- * Version: 1.11.1
+ * Version: 1.12.0
  *
  * A weather card with an animated current-conditions header, a sunrise/sunset
  * arc, and daily/hourly forecasts shown as iOS-style bars or a line graph.
@@ -26,6 +26,11 @@
  * EDITOR_I18N — and optionally WIND_DIRS). Keep the keys identical to `en`.
  * No other code changes are needed. See CONTRIBUTING.md for the full guide.
  * ═══════════════════════════════════════════════════════════════════════════ */
+
+// Versione della card: unico punto da aggiornare a ogni release (il banner in
+// console la legge da qui). Ricordarsi di allineare anche il commento "Version:"
+// in testa al file.
+const CARD_VERSION = '1.12.0';
 
 // Lingue supportate: codice card -> locale usato per date/orari.
 const SUPPORTED_LANGS = {
@@ -169,13 +174,13 @@ const CONDITION_LABELS = {
 };
 
 const UI_LABELS = {
-  it: { sunrise: 'alba', sunset: 'tramonto', daily: 'Giorni', hourly: 'Ore', sunset_in: 'Tramonto tra', sunrise_in: 'Alba tra', hm_join: ' e ' },
-  en: { sunrise: 'sunrise', sunset: 'sunset', daily: 'Daily', hourly: 'Hourly', sunset_in: 'Sunset in', sunrise_in: 'Sunrise in', hm_join: ' ' },
-  de: { sunrise: 'Sonnenaufgang', sunset: 'Sonnenuntergang', daily: 'Tage', hourly: 'Stunden', sunset_in: 'Sonnenuntergang in', sunrise_in: 'Sonnenaufgang in', hm_join: ' und ' },
-  nl: { sunrise: 'zonsopgang', sunset: 'zonsondergang', daily: 'Dagen', hourly: 'Uren', sunset_in: 'Zonsondergang over', sunrise_in: 'Zonsopgang over', hm_join: ' en ' },
-  fr: { sunrise: 'lever', sunset: 'coucher', daily: 'Quotidien', hourly: 'Horaire', sunset_in: 'Coucher du soleil dans', sunrise_in: 'Lever du soleil dans', hm_join: ' et ' },
-  pl: { sunrise: 'wschód', sunset: 'zachód', daily: 'Dzienna', hourly: 'Godzinowa', sunset_in: 'Zachód za', sunrise_in: 'Wschód za', hm_join: ' ' },
-  sv: { sunrise: 'soluppgång', sunset: 'solnedgång', daily: 'Daglig', hourly: 'Timvis', sunset_in: 'Solnedgång om', sunrise_in: 'Soluppgång om', hm_join: ' ' },
+  it: { sunrise: 'alba', sunset: 'tramonto', daily: 'Giorni', hourly: 'Ore', sunset_in: 'Tramonto tra', sunrise_in: 'Alba tra', hm_join: ' e ', no_data: 'Dato non disponibile' },
+  en: { sunrise: 'sunrise', sunset: 'sunset', daily: 'Daily', hourly: 'Hourly', sunset_in: 'Sunset in', sunrise_in: 'Sunrise in', hm_join: ' ', no_data: 'No data available' },
+  de: { sunrise: 'Sonnenaufgang', sunset: 'Sonnenuntergang', daily: 'Tage', hourly: 'Stunden', sunset_in: 'Sonnenuntergang in', sunrise_in: 'Sonnenaufgang in', hm_join: ' und ', no_data: 'Keine Daten verfügbar' },
+  nl: { sunrise: 'zonsopgang', sunset: 'zonsondergang', daily: 'Dagen', hourly: 'Uren', sunset_in: 'Zonsondergang over', sunrise_in: 'Zonsopgang over', hm_join: ' en ', no_data: 'Geen gegevens beschikbaar' },
+  fr: { sunrise: 'lever', sunset: 'coucher', daily: 'Quotidien', hourly: 'Horaire', sunset_in: 'Coucher du soleil dans', sunrise_in: 'Lever du soleil dans', hm_join: ' et ', no_data: 'Aucune donnée disponible' },
+  pl: { sunrise: 'wschód', sunset: 'zachód', daily: 'Dzienna', hourly: 'Godzinowa', sunset_in: 'Zachód za', sunrise_in: 'Wschód za', hm_join: ' ', no_data: 'Brak danych' },
+  sv: { sunrise: 'soluppgång', sunset: 'solnedgång', daily: 'Daglig', hourly: 'Timvis', sunset_in: 'Solnedgång om', sunrise_in: 'Soluppgång om', hm_join: ' ', no_data: 'Ingen data tillgänglig' },
 };
 
 // Sigle bussola a 16 punti per lingua (le lettere cambiano: E/O in IT, E/W in EN...).
@@ -205,6 +210,11 @@ class SunWeatherCard extends HTMLElement {
       // interruttore Giorni/Ore nella card: disattivato di default,
       // la modalita' si sceglie da forecast_type nel YAML
       show_forecast_toggle: false,
+      // selettore in-card per cambiare l'attributo del grafico al volo (solo
+      // layout 'graph'): disattivato di default
+      show_forecast_attribute_toggle: false,
+      // stile del selettore in-card: 'dropdown' (tendina, default) o 'chips'
+      forecast_attribute_toggle_style: 'dropdown',
       locale: 'it-IT',
       time_format: '24',
       // lingua della card: 'it', 'en' oppure 'system' (segue HA/browser)
@@ -223,11 +233,17 @@ class SunWeatherCard extends HTMLElement {
       // layout previsioni giornaliere: 'bars' (righe con barre) o 'graph'
       // (grafico orizzontale a due linee con icone sopra e mm sotto)
       forecast_layout: 'bars',
-      // nel layout 'graph': false = linee a colore fisso (arancio/azzurro);
-      // true = linee colorate in base alla temperatura come le barre
-      graph_color_by_temp: false,
+      // colora per valore (barre + grafico): true = temperatura a gradiente,
+      // UV/percepita/rugiada con la loro scala; false = temperatura statica
+      // teal->arancio e attributi a valore singolo a colore piatto.
+      // 'graph_color_by_temp' resta come alias retrocompatibile (vecchio nome).
+      color_by_value: true,
       // nel layout 'graph': false = pioggia come testo; true = barrette
       graph_precip_bars: false,
+      // nel layout 'graph': quale attributo del forecast tracciare come linea.
+      // 'temperature' = comportamento storico (max/min, scala colore, banda);
+      // ogni altro attributo = linea singola con asse riscalato
+      forecast_attribute: 'temperature',
       // quante righe di previsione restano sempre visibili; le altre
       // diventano scrollabili verticalmente. null = mostra tutte senza scroll.
       visible_rows: null,
@@ -237,6 +253,11 @@ class SunWeatherCard extends HTMLElement {
       // preserva la leggibilita' del testo.
       transparent: false,
       background_image: null,
+      // sfondo CSS libero (colore o gradiente). Precedenza: immagine > css >
+      // trasparente > tema.
+      background_css: null,
+      // testo chiaro forzato (per sfondi scuri): aggiunge la classe bg-dark
+      light_text: false,
       // velo sopra l'immagine di sfondo, valore unico da -1 a +1:
       //  -1 = chiaro pieno, 0 = nessun velo, +1 = scuro pieno.
       background_overlay: 0,
@@ -251,6 +272,8 @@ class SunWeatherCard extends HTMLElement {
       this._config.details = [];
     }
     this._forecastMode = this._config.forecast_type === 'hourly' ? 'hourly' : 'daily';
+    // attributo attivo del grafico (chip in-card): parte dal valore configurato
+    this._forecastAttrMode = this._config.forecast_attribute || 'temperature';
     this._daily = null;
     this._hourly = null;
     this._dailyFetchedAt = 0;
@@ -269,6 +292,7 @@ class SunWeatherCard extends HTMLElement {
     this._barsSig = null;
     this._hourlySig = null;
     this._graphSig = null;
+    this._compactSig = null;
     this._lastForecastKind = null;
     // larghezza utile del contenitore grafico, misurata via ResizeObserver
     // invece che a ogni render (evita un reflow sincrono per tick)
@@ -336,6 +360,13 @@ class SunWeatherCard extends HTMLElement {
         ha-card.bg-dark .cur-hilo,
         ha-card.bg-dark .detail-item,
         ha-card.bg-dark .forecast-row,
+        ha-card.bg-dark .forecast-row .label,
+        ha-card.bg-dark .forecast-row .temp-min,
+        ha-card.bg-dark .forecast-row .temp-max,
+        ha-card.bg-dark .graph-nodata,
+        ha-card.bg-dark .compact-col .c-day,
+        ha-card.bg-dark .compact-col .c-max,
+        ha-card.bg-dark .compact-col .c-min,
         ha-card.bg-dark .fc-graph .g-day,
         ha-card.bg-dark .fc-graph .g-tmax,
         ha-card.bg-dark .fc-graph .g-tmin {
@@ -573,13 +604,72 @@ class SunWeatherCard extends HTMLElement {
         }
 
         /* --- Previsioni --- */
+        /* riga controlli: toggle Giorni/Ore (fisso) + chip attributi (scorrono).
+           Una sola riga, mai a capo, cosi' la card non si allunga. */
+        .forecast-controls {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin-bottom: 12px;
+          min-width: 0;
+        }
+        .forecast-controls:empty { display: none; }
         .forecast-toggle {
           display: inline-flex;
+          flex: none;
           gap: 2px;
           padding: 2px;
-          margin-bottom: 12px;
           border-radius: 999px;
           background: var(--divider-color, #e5e5e5);
+        }
+        /* chip attributi: occupano lo spazio restante e scorrono in orizzontale */
+        .attr-chips {
+          display: flex;
+          flex: 1;
+          min-width: 0;
+          gap: 7px;
+          overflow-x: auto;
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+          -webkit-overflow-scrolling: touch;
+          -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent 100%);
+          mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent 100%);
+        }
+        .attr-chips::-webkit-scrollbar { width: 0; height: 0; display: none; }
+        .attr-chip {
+          flex: none;
+          border: none;
+          font: inherit;
+          font-size: 0.82em;
+          font-weight: 600;
+          padding: 5px 13px;
+          border-radius: 999px;
+          cursor: pointer;
+          background: var(--divider-color, #e5e5e5);
+          color: var(--secondary-text-color);
+          transition: background 0.15s, color 0.15s;
+        }
+        .attr-chip.active {
+          background: var(--primary-color);
+          color: var(--text-primary-color, #fff);
+        }
+        /* selettore a tendina (stile alternativo alle chip) */
+        .attr-select-wrap { position: relative; flex: none; }
+        .attr-select-wrap::after {
+          content: '▾';
+          position: absolute; right: 11px; top: 50%;
+          transform: translateY(-50%);
+          pointer-events: none;
+          color: var(--secondary-text-color);
+          font-size: 0.7em;
+        }
+        .attr-select {
+          appearance: none; -webkit-appearance: none;
+          border: none; font: inherit; font-size: 0.82em; font-weight: 600;
+          padding: 6px 26px 6px 13px;
+          border-radius: 999px; cursor: pointer;
+          background: var(--divider-color, #e5e5e5);
+          color: var(--primary-text-color);
         }
         .forecast-toggle button {
           border: none;
@@ -625,6 +715,24 @@ class SunWeatherCard extends HTMLElement {
         }
         .forecast-scroll.graph-mode::-webkit-scrollbar { height: 0; display: none; }
         .fc-graph { display: block; flex: none; overflow: visible; }
+        .graph-nodata {
+          padding: 24px 12px; text-align: center;
+          font-size: 13px; color: var(--secondary-text-color);
+        }
+        /* layout compatto: colonne orizzontali giorno + icona + temperature */
+        .fc-compact { display: flex; gap: 2px; }
+        .compact-col {
+          display: flex; flex-direction: column; align-items: center;
+          gap: 5px; padding: 2px 0; min-width: 0;
+        }
+        .compact-col .c-day {
+          font-size: 0.82em; font-weight: 500;
+          color: var(--secondary-text-color); white-space: nowrap;
+        }
+        .compact-col .c-ic { width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .compact-col .c-ic svg { width: 100%; height: 100%; overflow: hidden; }
+        .compact-col .c-max { font-size: 0.95em; font-weight: 700; color: var(--primary-text-color); }
+        .compact-col .c-min { font-size: 0.82em; color: var(--secondary-text-color); }
         .fc-graph .g-day {
           font-size: 12px; fill: var(--secondary-text-color); text-transform: capitalize;
         }
@@ -746,9 +854,15 @@ class SunWeatherCard extends HTMLElement {
         <div class="custom-details" id="custom-details"></div>
 
         <div class="forecast-list">
-          <div class="forecast-toggle" id="forecast-toggle">
-            <button type="button" data-mode="daily">Giorni</button>
-            <button type="button" data-mode="hourly">Ore</button>
+          <div class="forecast-controls" id="forecast-controls">
+            <div class="forecast-toggle" id="forecast-toggle">
+              <button type="button" data-mode="daily">Giorni</button>
+              <button type="button" data-mode="hourly">Ore</button>
+            </div>
+            <div class="attr-chips" id="attr-chips"></div>
+            <div class="attr-select-wrap" id="attr-select-wrap">
+              <select class="attr-select" id="attr-select"></select>
+            </div>
           </div>
           <div class="forecast-scroll" id="forecast-scroll"></div>
         </div>
@@ -778,7 +892,44 @@ class SunWeatherCard extends HTMLElement {
         if (mode === this._forecastMode) return;
         this._forecastMode = mode;
         this._updateToggleUI();
+        this._renderAttrChips();
         this._maybeFetchForecast();
+      });
+    }
+
+    // gestione chip attributo del grafico: cambia l'attributo tracciato al volo
+    const chips = this.shadowRoot.getElementById('attr-chips');
+    if (chips) {
+      chips.addEventListener('click', (ev) => {
+        const btn = ev.target.closest('button[data-attr]');
+        if (!btn) return;
+        const attr = btn.dataset.attr;
+        if (attr === this._forecastAttrMode) return;
+        this._forecastAttrMode = attr;
+        this._renderAttrChips();
+        // reset firme (barre + grafico) per forzare il ridisegno dell'attributo
+        this._graphSig = null; this._barsSig = null; this._hourlySig = null;
+        this._renderForecast();
+      });
+      // rotella del mouse -> scroll orizzontale delle chip (come il grafico)
+      chips.addEventListener('wheel', (ev) => {
+        if (chips.scrollWidth <= chips.clientWidth) return; // niente da scorrere
+        const delta = Math.abs(ev.deltaX) > Math.abs(ev.deltaY) ? ev.deltaX : ev.deltaY;
+        if (delta === 0) return;
+        chips.scrollLeft += delta;
+        ev.preventDefault();
+      }, { passive: false });
+    }
+
+    // selettore a tendina dell'attributo (stile alternativo alle chip)
+    const attrSel = this.shadowRoot.getElementById('attr-select');
+    if (attrSel) {
+      attrSel.addEventListener('change', (ev) => {
+        const attr = ev.target.value;
+        if (!attr || attr === this._forecastAttrMode) return;
+        this._forecastAttrMode = attr;
+        this._graphSig = null; this._barsSig = null; this._hourlySig = null;
+        this._renderForecast();
       });
     }
 
@@ -789,7 +940,7 @@ class SunWeatherCard extends HTMLElement {
       let held = false;
       let clickTimer = null;
 
-      const isInternal = (ev) => ev.target.closest('.forecast-toggle');
+      const isInternal = (ev) => ev.target.closest('.forecast-controls');
 
       card.addEventListener('pointerdown', (ev) => {
         if (isInternal(ev)) return;
@@ -882,6 +1033,102 @@ class SunWeatherCard extends HTMLElement {
       b.textContent = b.dataset.mode === 'daily' ? L.daily : L.hourly;
       b.classList.toggle('active', b.dataset.mode === this._forecastMode);
     });
+    this._renderAttrChips();
+  }
+
+  // Etichetta corta e localizzata per una chip attributo.
+  _attrChipLabel(attr) {
+    const m = GRAPH_ATTR_SHORT[langCode(this._locale())] || GRAPH_ATTR_SHORT.en;
+    return m[attr] || attr;
+  }
+
+  // Attributi (tra GRAPH_ATTRS) realmente presenti nelle previsioni correnti
+  // (daily o hourly a seconda della modalita'). null se i dati non ci sono ancora.
+  _availAttrsFromForecast() {
+    const src = this._forecastMode === 'hourly' ? this._hourly : this._daily;
+    if (!src || !src.length) return null;
+    return GRAPH_ATTRS.filter((a) => a === 'temperature' || src.some((d) => typeof d[a] === 'number'));
+  }
+
+  // Lista di attributi offerti nel selettore in-card. L'attributo di default
+  // (forecast_attribute) e' SEMPRE incluso, in testa. 'forecast_attributes' elenca
+  // gli ALTRI attributi da aggiungere:
+  //  - chiave assente  -> offri tutti i disponibili (default incluso)
+  //  - array (anche []) -> offri default + quelli elencati
+  _attrChipList() {
+    const avail = this._availAttrsFromForecast();
+    const def = this._config.forecast_attribute || 'temperature';
+    const defOk = !avail || avail.includes(def);
+    const cfg = this._config.forecast_attributes;
+    let list;
+    if (Array.isArray(cfg)) {
+      const extras = cfg.filter((a) => GRAPH_ATTRS.includes(a) && a !== def && (!avail || avail.includes(a)));
+      list = defOk ? [def, ...extras] : extras;
+    } else {
+      // non configurato: tutti i disponibili, con il default in testa
+      list = avail ? avail.slice() : [];
+      if (defOk && !list.includes(def)) list.unshift(def);
+      else if (defOk) list = [def, ...list.filter((a) => a !== def)];
+    }
+    return list;
+  }
+
+  // Disegna il selettore attributo in-card (solo layout grafico + opzione
+  // attiva), come tendina (default) o chip, e gestisce la visibilita' della
+  // riga controlli. Una riga, mai a capo.
+  _renderAttrChips() {
+    const wrap = this.shadowRoot && this.shadowRoot.getElementById('forecast-controls');
+    const box = this.shadowRoot && this.shadowRoot.getElementById('attr-chips');
+    const selWrap = this.shadowRoot && this.shadowRoot.getElementById('attr-select-wrap');
+    const sel = this.shadowRoot && this.shadowRoot.getElementById('attr-select');
+    if (!box || !wrap || !selWrap || !sel) return;
+    // il selettore vale per entrambi i layout (barre e grafico)
+    const on = this._config.show_forecast_attribute_toggle === true;
+    const list = on ? this._attrChipList() : [];
+    // l'attributo attivo deve essere tra gli offerti (anche se e' uno solo):
+    // cosi' mettere un solo attributo traccia direttamente quello
+    if (list.length && !list.includes(this._forecastAttrMode)) {
+      this._forecastAttrMode = list[0];
+      this._graphSig = null;
+    }
+    // il selettore (chip/tendina) ha senso solo con almeno 2 scelte
+    const showSel = list.length >= 2;
+    const useChips = this._config.forecast_attribute_toggle_style === 'chips';
+    const toggleOn = this._config.show_forecast_toggle === true;
+
+    if (!showSel) {
+      // niente selettore: nascondi entrambe le forme (il grafico mostra comunque
+      // l'attributo attivo, che con lista di 1 e' quell'unico attributo)
+      if (box.dataset.sig !== '') { box.innerHTML = ''; box.dataset.sig = ''; }
+      box.style.display = 'none';
+      selWrap.style.display = 'none';
+    } else if (useChips) {
+      selWrap.style.display = 'none';
+      box.style.display = 'flex';
+      const sig = `${list.join(',')}|${this._forecastAttrMode}`;
+      if (box.dataset.sig !== sig) {
+        box.dataset.sig = sig;
+        box.innerHTML = list.map((a) =>
+          `<button type="button" class="attr-chip${a === this._forecastAttrMode ? ' active' : ''}" data-attr="${a}">${this._attrChipLabel(a)}</button>`
+        ).join('');
+      }
+    } else {
+      // tendina
+      box.style.display = 'none';
+      selWrap.style.display = 'block';
+      // la tendina resta sempre a destra, anche senza il toggle Giorni/Ore
+      selWrap.style.marginLeft = 'auto';
+      const sig = list.join(',');
+      if (sel.dataset.sig !== sig) {
+        sel.dataset.sig = sig;
+        sel.innerHTML = list.map((a) =>
+          `<option value="${a}">${this._attrChipLabel(a)}</option>`
+        ).join('');
+      }
+      if (sel.value !== this._forecastAttrMode) sel.value = this._forecastAttrMode;
+    }
+    // la riga controlli si mostra se c'e' il toggle Giorni/Ore o il selettore
+    wrap.style.display = (toggleOn || showSel) ? 'flex' : 'none';
   }
 
   set hass(hass) {
@@ -917,13 +1164,15 @@ class SunWeatherCard extends HTMLElement {
       const act = (this._config.tap_action && this._config.tap_action.action) || 'more-info';
       cardEl.classList.toggle('clickable', act !== 'none');
 
-      // immagine di sfondo e trasparenza sono mutuamente esclusive:
-      // se c'e' un'immagine, ha la precedenza e la trasparenza viene ignorata.
+      // precedenza sfondo: immagine > css > trasparente > tema.
       const bg = this._config.background_image;
       const hasBg = !!bg;
+      const css = (this._config.background_css || '').trim();
+      const hasCss = !!css && !hasBg;              // l'immagine vince sul css
+      const lightText = this._config.light_text === true;
 
-      // sfondo trasparente (solo se non c'e' un'immagine)
-      const wantTransparent = this._config.transparent === true && !hasBg;
+      // sfondo trasparente solo se non c'e' ne' immagine ne' css
+      const wantTransparent = this._config.transparent === true && !hasBg && !hasCss;
       cardEl.classList.toggle('transparent', wantTransparent);
 
       // Applica la trasparenza anche come stile inline con !important:
@@ -958,6 +1207,7 @@ class SunWeatherCard extends HTMLElement {
       }
 
       // immagine di sfondo con velo incorporato, dipinta sulla card stessa
+      let autoDark = false;
       if (hasBg) {
         cardEl.classList.add('has-bg-image');
 
@@ -978,9 +1228,26 @@ class SunWeatherCard extends HTMLElement {
         const bgUrl = String(bg).trim();
         cardEl.style.setProperty('background-image',
           `linear-gradient(${veil}, ${veil}), url("${bgUrl}")`, 'important');
-        cardEl.classList.toggle('bg-dark', dark && op >= 0.4);
+        autoDark = dark && op >= 0.4;
+      } else if (hasCss) {
+        // sfondo CSS libero: colore pieno o gradiente
+        cardEl.classList.remove('has-bg-image');
+        cardEl.style.setProperty('background-color', 'transparent', 'important');
+        cardEl.style.setProperty('--ha-card-background', 'transparent', 'important');
+        cardEl.style.setProperty('--card-background-color', 'transparent', 'important');
+        if (/gradient|url\(/i.test(css)) {
+          cardEl.style.setProperty('background-image', css, 'important');
+          cardEl.style.removeProperty('background-color');
+          cardEl.style.setProperty('background-color', 'transparent', 'important');
+        } else {
+          // colore pieno
+          cardEl.style.setProperty('background-image', 'none', 'important');
+          cardEl.style.setProperty('background-color', css, 'important');
+          cardEl.style.setProperty('--ha-card-background', css, 'important');
+          cardEl.style.setProperty('--card-background-color', css, 'important');
+        }
       } else {
-        cardEl.classList.remove('has-bg-image', 'bg-dark');
+        cardEl.classList.remove('has-bg-image');
         cardEl.style.removeProperty('background-image');
         if (!wantTransparent) {
           cardEl.style.removeProperty('background-color');
@@ -988,6 +1255,8 @@ class SunWeatherCard extends HTMLElement {
           cardEl.style.removeProperty('--card-background-color');
         }
       }
+      // testo chiaro: automatico (velo scuro forte su immagine) o forzato da light_text
+      cardEl.classList.toggle('bg-dark', lightText || autoDark);
     }
 
     timeEl.textContent = timeFmt.format(now);
@@ -1689,21 +1958,35 @@ class SunWeatherCard extends HTMLElement {
   }
 
   _renderForecast() {
+    // layout 'none': nasconde del tutto la sezione previsioni (header, arco e
+    // dettagli restano). Il forecast daily continua comunque a caricarsi perche'
+    // serve all'intestazione (max/min di oggi).
+    const listWrap = this.shadowRoot.querySelector('.forecast-list');
+    if (this._config.forecast_layout === 'none') {
+      if (listWrap) listWrap.style.display = 'none';
+      return;
+    }
+    if (listWrap) listWrap.style.display = '';
+
     const scroll = this.shadowRoot.getElementById('forecast-scroll');
     const graph = this._config.forecast_layout === 'graph';
-    // se cambia il "tipo" di previsione mostrata (barre/orarie/grafico), azzera
-    // le firme: lo stesso contenitore e' condiviso, quindi il nuovo renderer
-    // deve sempre ridisegnare invece di saltare per firma uguale
-    const kind = graph
-      ? (this._forecastMode === 'hourly' ? 'graph-hourly' : 'graph-daily')
-      : (this._forecastMode === 'hourly' ? 'hourly' : 'daily');
+    const compact = this._config.forecast_layout === 'compact';
+    // se cambia il "tipo" di previsione mostrata, azzera le firme: lo stesso
+    // contenitore e' condiviso, quindi il nuovo renderer deve sempre ridisegnare
+    const base = compact ? 'compact' : (graph ? 'graph' : 'bars');
+    const kind = `${base}-${this._forecastMode === 'hourly' ? 'hourly' : 'daily'}`;
     if (kind !== this._lastForecastKind) {
       this._lastForecastKind = kind;
       this._barsSig = null;
       this._hourlySig = null;
       this._graphSig = null;
+      this._compactSig = null;
     }
-    if (graph) {
+    if (compact) {
+      // layout compatto: colonne orizzontali (scroll come il grafico)
+      if (scroll) scroll.classList.add('graph-mode');
+      this._renderForecastCompact(this._forecastMode === 'hourly');
+    } else if (graph) {
       if (scroll) scroll.classList.add('graph-mode');
       if (this._forecastMode === 'hourly') this._renderForecastGraph(true);
       else this._renderForecastGraph(false);
@@ -1716,6 +1999,73 @@ class SunWeatherCard extends HTMLElement {
     }
   }
 
+  _renderForecastCompact(hourly) {
+    const list = this.shadowRoot.getElementById('forecast-scroll');
+    const source = hourly ? this._hourly : this._daily;
+    if (!list || !source || !source.length) return;
+    const days = source.slice(0, hourly ? this._config.forecast_hours : this._config.forecast_days);
+
+    const attr = this._forecastAttrMode || this._config.forecast_attribute || 'temperature';
+    const isTemp = attr === 'temperature';
+
+    // attributo a valore singolo senza dati -> messaggio
+    if (!isTemp && !days.some((d) => this._fcAttrValue(d, attr) != null)) {
+      const sig = `nodata:${attr}`;
+      if (this._compactSig !== sig) {
+        list.innerHTML = `<div class="graph-nodata">${this._uiLabels().no_data}</div>`;
+        this._compactSig = sig; list.style.maxHeight = 'none';
+      }
+      return;
+    }
+
+    const dayFmt = new Intl.DateTimeFormat(this._locale(), { weekday: 'short' });
+    const hourFmt = new Intl.DateTimeFormat(this._locale(), { hour: 'numeric', hour12: this._config.time_format === '12' });
+    const colLabel = (d) => hourly ? hourFmt.format(new Date(d.datetime)) : dayFmt.format(new Date(d.datetime));
+
+    // larghezza colonna: come il grafico, dalla larghezza misurata del contenitore
+    this._ensureGraphResizeObserver(list);
+    let cw = this._graphWidth;
+    if (!cw) { cw = this._measureGraphWidth(list); this._graphWidth = cw; }
+    const vr = this._config.visible_rows;
+    const n = Math.min(vr || days.length, days.length);
+    let colStyle = 'flex:1';
+    if (cw > 0) {
+      const colW = Math.max(Math.floor(cw / n), 40);
+      colStyle = `flex:0 0 ${colW}px`;
+    } else {
+      requestAnimationFrame(() => this._renderForecastCompact(hourly));
+    }
+
+    const sig = JSON.stringify({
+      attr, cw, n, hourly,
+      d: days.map((d) => [d.datetime,
+        hourly ? this._nightCondition(d.condition, d.datetime) : d.condition,
+        this._fcAttrValue(d, attr), isTemp ? d.templow : null]),
+    });
+    if (this._compactSig === sig) return;
+    this._compactSig = sig;
+
+    const cols = days.map((d) => {
+      this._iconUid += 1;
+      const cond = hourly ? this._nightCondition(d.condition, d.datetime) : d.condition;
+      const icon = this._icon(cond, this._iconUid, 28);
+      let valsHtml;
+      if (isTemp) {
+        const hi = d.temperature;
+        const lo = hourly ? null : (d.templow != null ? d.templow : d.temperature);
+        valsHtml = `<div class="c-max">${this._fmtForecastTemp(hi)}°</div>`
+          + (lo != null ? `<div class="c-min">${this._fmtForecastTemp(lo)}°</div>` : '');
+      } else {
+        valsHtml = `<div class="c-max">${this._graphValLabel(attr, this._fcAttrValue(d, attr))}</div>`;
+      }
+      return `<div class="compact-col" style="${colStyle}">`
+        + `<div class="c-day">${colLabel(d)}</div>`
+        + `<div class="c-ic">${icon}</div>${valsHtml}</div>`;
+    }).join('');
+    list.innerHTML = `<div class="fc-compact">${cols}</div>`;
+    list.style.maxHeight = 'none';
+  }
+
   _renderForecastDaily() {
     const list = this.shadowRoot.getElementById('forecast-scroll');
     if (!list || !this._daily || !this._daily.length) return;
@@ -1723,25 +2073,54 @@ class SunWeatherCard extends HTMLElement {
     const days = this._daily.slice(0, this._config.forecast_days);
     const dayFmt = new Intl.DateTimeFormat(this._locale(), { weekday: 'short' });
 
-    const lows = days.map((d) => d.templow).filter((v) => v != null);
-    const highs = days.map((d) => d.temperature).filter((v) => v != null);
-    const globalMin = Math.min(...lows, ...highs);
-    const globalMax = Math.max(...lows, ...highs);
-    const span = Math.max(globalMax - globalMin, 1);
+    // attributo tracciato: 'temperature' = barre range (come sempre); ogni altro
+    // attributo = barra di livello (riempimento proporzionale al valore)
+    const attr = this._forecastAttrMode || this._config.forecast_attribute || 'temperature';
+    const isTemp = attr === 'temperature';
+    const colorOn = this._colorByValue();
 
     // temperatura attuale dall'entita' weather, per il pallino su "oggi"
     const wState = this._hass.states[this._config.entity];
     const currentTemp = this._currentTemp();
     const precipUnit = this._esc(wState?.attributes?.precipitation_unit || 'mm');
-    const showPrecip = this._config.show_forecast_precipitation;
+    // la pioggia resta nella colonna destra, nascosta se l'attributo e' gia' pioggia
+    const showPrecip = this._config.show_forecast_precipitation && attr !== 'precipitation';
     const anyPrecip = showPrecip && days.some((d) => d.precipitation != null && d.precipitation > 0);
     const todayStr = new Date().toDateString();
+
+    // scala: range temperatura come prima; per gli altri attributi min/max dei
+    // valori con un margine, cosi' le differenze si leggono
+    let globalMin; let globalMax;
+    if (isTemp) {
+      const lows = days.map((d) => d.templow).filter((v) => v != null);
+      const highs = days.map((d) => d.temperature).filter((v) => v != null);
+      globalMin = Math.min(...lows, ...highs);
+      globalMax = Math.max(...lows, ...highs);
+    } else {
+      const vals = days.map((d) => this._fcAttrValue(d, attr)).filter((v) => v != null);
+      if (!vals.length) {
+        const sig = `nodata:${attr}`;
+        if (this._barsSig !== sig) {
+          list.innerHTML = `<div class="graph-nodata">${this._uiLabels().no_data}</div>`;
+          this._barsSig = sig;
+          list.style.maxHeight = 'none';
+        }
+        return;
+      }
+      globalMin = Math.min(...vals);
+      globalMax = Math.max(...vals);
+      const pad = globalMax === globalMin ? (Math.abs(globalMax) * 0.1 || 1) : (globalMax - globalMin) * 0.15;
+      globalMin -= pad;
+      globalMax += pad;
+    }
+    const span = Math.max(globalMax - globalMin, 1);
 
     // firma sui DATI (non sull'HTML: le icone hanno un uid che cambia a ogni
     // render). Se nulla e' cambiato, non ricostruire ne' riapplicare lo scroll.
     const barsSig = JSON.stringify({
-      d: days.map((x) => [x.datetime, x.condition, x.temperature, x.templow, x.precipitation]),
-      currentTemp, showPrecip, anyPrecip, precipUnit,
+      attr,
+      d: days.map((x) => [x.datetime, x.condition, this._fcAttrValue(x, attr), x.templow, x.precipitation]),
+      currentTemp, showPrecip, anyPrecip, precipUnit, colorOn,
     });
     if (this._barsSig === barsSig) return;
     this._barsSig = barsSig;
@@ -1750,36 +2129,33 @@ class SunWeatherCard extends HTMLElement {
       .map((d) => {
         const date = new Date(d.datetime);
         const label = dayFmt.format(date);
-        const low = d.templow != null ? d.templow : d.temperature;
-        const high = d.temperature;
-        const leftPct = ((low - globalMin) / span) * 100;
-        const widthPct = Math.max(((high - low) / span) * 100, 8);
-        const colorLow = this._tempToColor(low);
-        const colorHigh = this._tempToColor(high);
-
-        // pallino temperatura attuale: solo sulla riga di oggi
-        let dotHtml = '';
-        if (
-          currentTemp != null &&
-          date.toDateString() === todayStr
-        ) {
-          const clampedTemp = Math.min(Math.max(currentTemp, globalMin), globalMax);
-          const dotPct = ((clampedTemp - globalMin) / span) * 100;
-          dotHtml = `<div class="bar-dot" style="left:${dotPct}%;"></div>`;
-        }
-
         this._iconUid += 1;
         const icon = this._icon(d.condition, this._iconUid, 28);
 
         // mm di pioggia previsti per il giorno (se presenti e > 0); sui giorni
         // senza pioggia riservo comunque la riga (vuota) quando qualche giorno
-        // ce l'ha, cosi' le massime restano allineate
+        // ce l'ha, cosi' le colonne destre restano allineate
         const hasPrecip = showPrecip && d.precipitation != null && d.precipitation > 0;
         const precipHtml = hasPrecip
           ? `<span class="f-precip">${d.precipitation} ${precipUnit}</span>`
           : (anyPrecip ? '<span class="f-precip">&nbsp;</span>' : '');
 
-        return `
+        if (isTemp) {
+          const low = d.templow != null ? d.templow : d.temperature;
+          const high = d.temperature;
+          const leftPct = ((low - globalMin) / span) * 100;
+          const widthPct = Math.max(((high - low) / span) * 100, 8);
+          // colorato per temperatura (gradiente per valore) o statico teal->arancio
+          const colorLow = colorOn ? this._tempToColor(low) : '#35b5c4';
+          const colorHigh = colorOn ? this._tempToColor(high) : '#ff7a59';
+          // pallino temperatura attuale: solo sulla riga di oggi
+          let dotHtml = '';
+          if (currentTemp != null && date.toDateString() === todayStr) {
+            const clampedTemp = Math.min(Math.max(currentTemp, globalMin), globalMax);
+            const dotPct = ((clampedTemp - globalMin) / span) * 100;
+            dotHtml = `<div class="bar-dot" style="left:${dotPct}%;"></div>`;
+          }
+          return `
           <div class="forecast-row${anyPrecip ? ' has-precip' : ''}">
             <div class="label">${label}</div>
             <div class="icon-wrap">${icon}</div>
@@ -1790,6 +2166,27 @@ class SunWeatherCard extends HTMLElement {
             </div>
             <div class="temp-group">
               <span class="temp-max">${this._fmtForecastTemp(high)}\u00b0</span>
+              ${precipHtml}
+            </div>
+          </div>
+        `;
+        }
+        // attributo a valore singolo: barra di livello 0 -> valore
+        const v = this._fcAttrValue(d, attr);
+        const widthPct = v == null ? 0 : 8 + ((v - globalMin) / span) * 84;
+        // UV/percepita/rugiada: scala colore se "colora per valore" e' attivo;
+        // gli altri attributi (e tutti quando spento) a colore primario piatto
+        const barColor = (colorOn && this._hasColorScale(attr)) ? this._scaleColor(attr, v) : 'var(--primary-color)';
+        return `
+          <div class="forecast-row${anyPrecip ? ' has-precip' : ''}">
+            <div class="label">${label}</div>
+            <div class="icon-wrap">${icon}</div>
+            <div class="temp-min"></div>
+            <div class="bar-track">
+              <div class="bar-fill" style="left:0%; width:${widthPct.toFixed(1)}%; background:${barColor};"></div>
+            </div>
+            <div class="temp-group">
+              <span class="temp-max">${this._graphValLabel(attr, v)}</span>
               ${precipHtml}
             </div>
           </div>
@@ -1810,9 +2207,28 @@ class SunWeatherCard extends HTMLElement {
       return;
     }
 
-    const temps = hours.map((h) => h.temperature).filter((v) => v != null);
-    const globalMin = Math.min(...temps);
-    const globalMax = Math.max(...temps);
+    // attributo tracciato: temperatura (come sempre) o altro attributo a valore
+    // singolo. In entrambi i casi la barra oraria e' gia' un "livello".
+    const attr = this._forecastAttrMode || this._config.forecast_attribute || 'temperature';
+    const isTemp = attr === 'temperature';
+    const colorOn = this._colorByValue();
+    const vals = hours.map((h) => this._fcAttrValue(h, attr)).filter((v) => v != null);
+    if (!vals.length) {
+      const sig = `nodata:${attr}`;
+      if (this._hourlySig !== sig) {
+        list.innerHTML = `<div class="graph-nodata">${this._uiLabels().no_data}</div>`;
+        this._hourlySig = sig;
+        list.style.maxHeight = 'none';
+      }
+      return;
+    }
+    let globalMin = Math.min(...vals);
+    let globalMax = Math.max(...vals);
+    if (!isTemp) {
+      const pad = globalMax === globalMin ? (Math.abs(globalMax) * 0.1 || 1) : (globalMax - globalMin) * 0.15;
+      globalMin -= pad;
+      globalMax += pad;
+    }
     const span = Math.max(globalMax - globalMin, 1);
 
     const hourFmt = new Intl.DateTimeFormat(this._locale(), {
@@ -1823,7 +2239,7 @@ class SunWeatherCard extends HTMLElement {
     // firma sui DATI (la condizione e' quella gia' adattata giorno/notte, cosi'
     // riflette esattamente l'icona disegnata). Se invariata, non ricostruire.
     const hourlySig = JSON.stringify(
-      hours.map((h) => [h.datetime, this._nightCondition(h.condition, h.datetime), h.temperature])
+      hours.map((h) => [h.datetime, this._nightCondition(h.condition, h.datetime), this._fcAttrValue(h, attr), attr, colorOn])
     );
     if (this._hourlySig === hourlySig) return;
     this._hourlySig = hourlySig;
@@ -1832,10 +2248,13 @@ class SunWeatherCard extends HTMLElement {
       .map((h) => {
         const date = new Date(h.datetime);
         const label = hourFmt.format(date);
-        const t = h.temperature;
-        // barra come "livello" di temperatura sul range delle ore mostrate
-        const widthPct = Math.max(((t - globalMin) / span) * 100, 6);
-        const color = this._tempToColor(t);
+        const v = this._fcAttrValue(h, attr);
+        // barra come "livello" sul range delle ore mostrate
+        const widthPct = v == null ? 0 : Math.max(((v - globalMin) / span) * 100, 6);
+        const color = isTemp
+          ? (colorOn ? this._tempToColor(v) : '#ff7a59')
+          : ((colorOn && this._hasColorScale(attr)) ? this._scaleColor(attr, v) : 'var(--primary-color)');
+        const valLabel = isTemp ? `${this._fmtForecastTemp(v)}\u00b0` : this._graphValLabel(attr, v);
 
         this._iconUid += 1;
         const icon = this._icon(this._nightCondition(h.condition, h.datetime), this._iconUid, 28);
@@ -1847,7 +2266,7 @@ class SunWeatherCard extends HTMLElement {
             <div class="bar-track">
               <div class="bar-fill" style="left:0%; width:${widthPct}%; background:${color};"></div>
             </div>
-            <div class="temp-max">${this._fmtForecastTemp(t)}\u00b0</div>
+            <div class="temp-max">${valLabel}</div>
           </div>
         `;
       })
@@ -1871,6 +2290,21 @@ class SunWeatherCard extends HTMLElement {
     return [[0, startY], ...pts, [w, endY]];
   }
 
+  // Come _extendToEdges ma verso bordi espliciti (leftX/rightX): estende solo se
+  // il bordo e' oltre il primo/ultimo punto. Serve ai dati parziali, cosi' la
+  // linea non prolunga la pendenza dove l'attributo non ha valori.
+  _extendToBounds(pts, leftX, rightX) {
+    if (!pts || pts.length < 2) return pts || [];
+    const first = pts[0], second = pts[1];
+    const last = pts[pts.length - 1], prev = pts[pts.length - 2];
+    const slopeL = (second[1] - first[1]) / (second[0] - first[0] || 1);
+    const slopeR = (last[1] - prev[1]) / (last[0] - prev[0] || 1);
+    const out = pts.slice();
+    if (leftX < first[0]) out.unshift([leftX, first[1] - slopeL * (first[0] - leftX)]);
+    if (rightX > last[0]) out.push([rightX, last[1] + slopeR * (rightX - last[0])]);
+    return out;
+  }
+
   // Grafico orizzontale. hourly=false: due linee max/min per giorno.
   // hourly=true: una linea temperatura per ora, con l'ora sotto.
   // Misura la larghezza utile del contenitore (dentro il padding). Chiamata
@@ -1892,7 +2326,8 @@ class SunWeatherCard extends HTMLElement {
       const w = this._measureGraphWidth(l);
       if (w > 0 && w !== this._graphWidth) {
         this._graphWidth = w;
-        if (this._config.forecast_layout === 'graph') this._renderForecast();
+        const lay = this._config.forecast_layout;
+        if (lay === 'graph' || lay === 'compact') this._renderForecast();
       }
     });
     this._graphResizeObs.observe(list);
@@ -1913,16 +2348,56 @@ class SunWeatherCard extends HTMLElement {
       ? hourFmt.format(new Date(d.datetime))
       : dayFmt.format(new Date(d.datetime));
 
+    // Attributo tracciato (#7): 'temperature' = comportamento storico (banda
+    // max/min nel daily, scala colore, etichette in °). Ogni altro attributo =
+    // linea singola. hasMinRow abilita la banda min solo per la temperatura daily.
+    // _forecastAttrMode riflette la chip attiva (parte da forecast_attribute).
+    const attr = this._forecastAttrMode || this._config.forecast_attribute || 'temperature';
+    const isTemp = attr === 'temperature';
+    const hasMinRow = isTemp && !hourly;
+    const valFor = (d) => {
+      const v = isTemp ? d.temperature : d[attr];
+      if (typeof v === 'number') return v;
+      const n = v != null ? parseFloat(v) : NaN;
+      return isNaN(n) ? null : n;
+    };
+
     const wState = this._hass.states[this._config.entity];
     const precipUnit = this._esc(wState?.attributes?.precipitation_unit || 'mm');
-    const showPrecip = this._config.show_forecast_precipitation && !hourly;
+    // la pioggia (overlay) resta solo nel daily e viene nascosta se l'attributo
+    // scelto e' gia' 'precipitation' (sarebbe ridondante)
+    const showPrecip = this._config.show_forecast_precipitation && !hourly && attr !== 'precipitation';
 
-    const highs = days.map((d) => d.temperature).filter((v) => v != null);
-    const lows = hourly
-      ? highs
-      : days.map((d) => (d.templow != null ? d.templow : d.temperature)).filter((v) => v != null);
-    const gMax = Math.max(...highs);
-    const gMin = Math.min(...lows);
+    const vals = days.map(valFor).filter((v) => v != null);
+    // l'attributo scelto non e' presente nelle previsioni dell'integrazione:
+    // mostra un messaggio invece di un grafico vuoto (rete di sicurezza — il
+    // menu dell'editor di norma elenca solo gli attributi disponibili)
+    if (!vals.length) {
+      const noDataSig = `nodata:${attr}`;
+      if (this._graphSig !== noDataSig) {
+        list.innerHTML = `<div class="graph-nodata">${this._uiLabels().no_data}</div>`;
+        this._graphSig = noDataSig;
+        list.style.maxHeight = 'none';
+      }
+      return;
+    }
+    let gMax;
+    let gMin;
+    if (isTemp) {
+      const highs = days.map((d) => d.temperature).filter((v) => v != null);
+      const lows = hourly
+        ? highs
+        : days.map((d) => (d.templow != null ? d.templow : d.temperature)).filter((v) => v != null);
+      gMax = Math.max(...highs);
+      gMin = Math.min(...lows);
+    } else {
+      gMax = vals.length ? Math.max(...vals) : 1;
+      gMin = vals.length ? Math.min(...vals) : 0;
+      // margine sopra/sotto cosi' la linea non tocca i bordi della banda
+      const pad = gMax === gMin ? (Math.abs(gMax) * 0.1 || 1) : (gMax - gMin) * 0.15;
+      gMax += pad;
+      gMin -= pad;
+    }
     const span = Math.max(gMax - gMin, 1);
 
     // quanti giorni restano visibili senza scorrere:
@@ -1958,7 +2433,7 @@ class SunWeatherCard extends HTMLElement {
     const maxLabelH = hourly ? 18 : 26;   // spazio icone -> valore max (piu' aria nel daily)
     const bandTop = yIcon + iconSize + maxLabelH;
     const bandH = hourly ? 34 : 42; // banda temperature (piu' bassa per l'oraria)
-    const minLabelH = hourly ? 6 : 20;
+    const minLabelH = hasMinRow ? 20 : 6;
     const hasPrecipRow = showPrecip && days.some((d) => d.precipitation != null && d.precipitation > 0);
     // pioggia come barrette (opt-in) invece che testo: serve piu' altezza
     const precipBars = this._config.graph_precip_bars === true;
@@ -1969,12 +2444,13 @@ class SunWeatherCard extends HTMLElement {
     // (punti, curve, gradienti, icone). La condizione e' quella adattata
     // giorno/notte per l'oraria, cosi' riflette le icone luna disegnate.
     const graphSig = JSON.stringify({
-      hourly, w, showPrecip, hasPrecipRow, precipUnit,
-      color: this._config.graph_color_by_temp === true,
+      hourly, w, showPrecip, hasPrecipRow, precipUnit, attr,
+      color: this._colorByValue(),
       bars: precipBars,
       d: days.map((d) => [d.datetime,
         hourly ? this._nightCondition(d.condition, d.datetime) : d.condition,
-        d.temperature, d.templow, d.precipitation]),
+        valFor(d), hasMinRow ? (d.templow != null ? d.templow : d.temperature) : null,
+        d.precipitation]),
     });
     if (this._graphSig === graphSig) return;
     this._graphSig = graphSig;
@@ -1982,11 +2458,16 @@ class SunWeatherCard extends HTMLElement {
     const x = (i) => i * col + col / 2;
     const yT = (t) => bandTop + (1 - (t - gMin) / span) * bandH;
 
-    const ptsMax = days.map((d, i) => [x(i), yT(d.temperature)]);
-    const ptsMin = hourly ? [] : days.map((d, i) => {
+    // un punto per giorno; null se l'attributo manca per quel giorno (la linea
+    // salta il buco invece di crollare a zero)
+    const ptsMax = days.map((d, i) => {
+      const v = valFor(d);
+      return v == null ? null : [x(i), yT(v)];
+    });
+    const ptsMin = hasMinRow ? days.map((d, i) => {
       const lo = d.templow != null ? d.templow : d.temperature;
       return [x(i), yT(lo)];
-    });
+    }) : [];
 
     // path con curve morbide (Catmull-Rom -> Bézier)
     const smooth = (pts) => {
@@ -2009,7 +2490,13 @@ class SunWeatherCard extends HTMLElement {
 
     // colori/gradienti temperatura: definiti PRIMA dell'area cosi' il band fill
     // puo' riutilizzare il gradiente della linea max
-    const colorByTemp = this._config.graph_color_by_temp === true;
+    // la scala colore per temperatura ha senso solo per l'attributo temperatura
+    // "colora per valore": governa temperatura (gradiente), UV/percepita/rugiada
+    // (scala di significato). Spento -> temperatura statica, gli altri piatti.
+    const colorOn = this._colorByValue();
+    const colorByTemp = isTemp && colorOn;
+    // attributo a valore singolo con scala di significato (UV/percepita/rugiada)
+    const scaleAttr = !isTemp && colorOn && this._hasColorScale(attr);
     const gid = (this._iconUid += 1);
     const tempsMax = days.map((d) => d.temperature);
     const tempsMin = days.map((d) => (d.templow != null ? d.templow : d.temperature));
@@ -2017,30 +2504,58 @@ class SunWeatherCard extends HTMLElement {
       const off = Math.max(0, Math.min(100, (p[0] / w) * 100));
       return `<stop offset="${off.toFixed(1)}%" stop-color="${this._tempToColor(temps[i])}"/>`;
     }).join('');
+    // stop del gradiente scala (UV/percepita/rugiada): un colore per punto
+    const scaleStops = () => days.map((d, i) => {
+      const p = ptsMax[i];
+      if (!p) return '';
+      const off = Math.max(0, Math.min(100, (p[0] / w) * 100));
+      return `<stop offset="${off.toFixed(1)}%" stop-color="${this._scaleColor(attr, valFor(d))}"/>`;
+    }).join('');
     const gradMax = colorByTemp
       ? `<linearGradient id="gLineMax${gid}" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="${w}" y2="0">${stopsFor(ptsMax, tempsMax)}</linearGradient>`
-      : '';
-    const gradMin = (colorByTemp && !hourly)
+      : (scaleAttr
+        ? `<linearGradient id="gLineMax${gid}" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="${w}" y2="0">${scaleStops()}</linearGradient>`
+        : '');
+    const gradMin = (colorByTemp && hasMinRow)
       ? `<linearGradient id="gLineMin${gid}" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="${w}" y2="0">${stopsFor(ptsMin, tempsMin)}</linearGradient>`
       : '';
-    const maxStroke = colorByTemp ? ` style="stroke:url(#gLineMax${gid})"` : '';
+    // colore della linea: gradiente (temp o scala) se attivo; altrimenti arancio
+    // di default per la temperatura statica, colore primario per gli altri piatti
+    const maxStroke = (colorByTemp || scaleAttr)
+      ? ` style="stroke:url(#gLineMax${gid})"`
+      : (isTemp ? '' : ' style="stroke:var(--primary-color)"');
     const minStroke = colorByTemp ? ` style="stroke:url(#gLineMin${gid})"` : '';
 
-    const lineMax = smooth(this._extendToEdges(ptsMax, w));
-    const lineMin = hourly ? '' : smooth(this._extendToEdges(ptsMin, w));
+    // la linea si estende ai bordi SOLO dove ci sono dati: se l'attributo manca
+    // negli ultimi (o primi) giorni, la linea si ferma all'ultimo punto valido
+    // invece di prolungare la pendenza nel vuoto (evita la "coda" fantasma)
+    const validMax = ptsMax.filter(Boolean);
+    const firstIdx = ptsMax.findIndex(Boolean);
+    let lastIdx = -1;
+    for (let i = ptsMax.length - 1; i >= 0; i--) { if (ptsMax[i]) { lastIdx = i; break; } }
+    const leftX = firstIdx <= 0 ? 0 : (validMax[0] ? validMax[0][0] : 0);
+    const rightX = (lastIdx >= days.length - 1 || lastIdx < 0)
+      ? w : validMax[validMax.length - 1][0];
+    const lineMax = smooth(this._extendToBounds(validMax, leftX, rightX));
+    const lineMin = hasMinRow ? smooth(this._extendToEdges(ptsMin, w)) : '';
     // area: con i colori attivi riempi la FASCIA tra max e min (band fill) col
     // gradiente temperatura; altrimenti resta la sfumatura arancione verso il
     // basso come prima (nessun cambiamento per chi non usa i colori)
     const areaBottom = bandTop + bandH + 2;
     let areaMax;
     let areaFill = '';
-    if (colorByTemp && !hourly) {
+    if (colorByTemp && hasMinRow) {
       const minExt = this._extendToEdges(ptsMin, w);
       const lineMinRev = smooth([...minExt].reverse()); // dal punto min piu' a destra
       areaMax = `${lineMax} L${lineMinRev.slice(1)} Z`;
       areaFill = ` style="fill:url(#gLineMax${gid});opacity:0.10"`;
     } else {
-      areaMax = `${lineMax} L ${w} ${areaBottom} L 0 ${areaBottom} Z`;
+      // chiudi l'area entro i bordi dei dati reali (leftX..rightX)
+      areaMax = `${lineMax} L ${rightX} ${areaBottom} L ${leftX} ${areaBottom} Z`;
+      // UV: solo linea colorata, niente area (eviterebbe colori in conflitto);
+      // altri attributi non-temperatura: riempimento primario molto tenue
+      if (scaleAttr) areaFill = ' style="fill:none"';
+      else if (!isTemp) areaFill = ' style="fill:var(--primary-color);opacity:0.10"';
     }
 
     const dayLabels = days.map((d, i) =>
@@ -2055,15 +2570,17 @@ class SunWeatherCard extends HTMLElement {
     }).join('');
 
     const maxLabels = days.map((d, i) => {
-      const [px, py] = ptsMax[i];
-      return `<text class="g-tmax" x="${px}" y="${py - 9}" text-anchor="middle">${this._fmtForecastTemp(d.temperature)}\u00b0</text>`;
+      const p = ptsMax[i];
+      if (!p) return '';
+      const [px, py] = p;
+      return `<text class="g-tmax" x="${px}" y="${py - 9}" text-anchor="middle">${this._graphValLabel(attr, valFor(d))}</text>`;
     }).join('');
 
-    const minLabels = hourly ? '' : days.map((d, i) => {
+    const minLabels = hasMinRow ? days.map((d, i) => {
       const [px, py] = ptsMin[i];
       const lo = d.templow != null ? d.templow : d.temperature;
       return `<text class="g-tmin" x="${px}" y="${py + 17}" text-anchor="middle">${this._fmtForecastTemp(lo)}\u00b0</text>`;
-    }).join('');
+    }).join('') : '';
 
     const precipLabels = !hasPrecipRow ? '' : (precipBars
       ? (() => {
@@ -2090,15 +2607,20 @@ class SunWeatherCard extends HTMLElement {
 
 
     const dotsMax = ptsMax.map((p, i) => {
-      const s = colorByTemp ? ` style="stroke:${this._tempToColor(tempsMax[i])}"` : '';
+      if (!p) return '';
+      const s = colorByTemp
+        ? ` style="stroke:${this._tempToColor(tempsMax[i])}"`
+        : (scaleAttr
+          ? ` style="stroke:${this._scaleColor(attr, valFor(days[i]))}"`
+          : (isTemp ? '' : ' style="stroke:var(--primary-color)"'));
       return `<circle class="g-dot-max" cx="${p[0]}" cy="${p[1]}" r="3"${s} />`;
     }).join('');
-    const dotsMin = hourly ? '' : ptsMin.map((p, i) => {
+    const dotsMin = hasMinRow ? ptsMin.map((p, i) => {
       const s = colorByTemp ? ` style="stroke:${this._tempToColor(tempsMin[i])}"` : '';
       return `<circle class="g-dot-min" cx="${p[0]}" cy="${p[1]}" r="3"${s} />`;
-    }).join('');
+    }).join('') : '';
 
-    const lineMinSvg = hourly ? '' : `<path class="g-line-min" d="${lineMin}"${minStroke} />`;
+    const lineMinSvg = hasMinRow ? `<path class="g-line-min" d="${lineMin}"${minStroke} />` : '';
 
     list.innerHTML = `
       <svg class="fc-graph" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" preserveAspectRatio="xMinYMid meet">
@@ -2143,6 +2665,29 @@ class SunWeatherCard extends HTMLElement {
     });
   }
 
+  // Valore numerico di un attributo del forecast per un giorno/ora (o null).
+  _fcAttrValue(d, attr) {
+    const v = attr === 'temperature' ? d.temperature : d[attr];
+    if (typeof v === 'number') return v;
+    const n = v != null ? parseFloat(v) : NaN;
+    return isNaN(n) ? null : n;
+  }
+
+  // Etichetta di un valore del grafico in base all'attributo (#7):
+  // gli attributi di temperatura usano i decimali previsioni + il simbolo °,
+  // le percentuali aggiungono %, gli altri mostrano solo il numero (unita' come
+  // hPa/km/h sarebbero troppo larghe per le colonne strette).
+  _graphValLabel(attr, v) {
+    if (v == null) return '';
+    if (attr === 'temperature' || attr === 'apparent_temperature' || attr === 'dew_point') {
+      return `${this._fmtForecastTemp(v)}°`;
+    }
+    const pct = attr === 'humidity' || attr === 'precipitation_probability' || attr === 'cloud_coverage';
+    const r = Math.round(v * 10) / 10;
+    const s = Math.abs(r - Math.round(r)) < 0.05 ? String(Math.round(r)) : r.toFixed(1);
+    return pct ? `${s}%` : s;
+  }
+
   _tempToColor(t) {
     // fino a 35°: scala invariata (blu a -10° -> rosso pieno a 35°)
     const clamped = Math.min(Math.max(t, -10), 35);
@@ -2161,6 +2706,37 @@ class SunWeatherCard extends HTMLElement {
       light = 55 - (under / 20) * 20;        // 55% -> 35%
     }
     return `hsl(${hue}, 85%, ${light}%)`;
+  }
+
+  // Toggle "colora per valore": default true. Legge color_by_value; se assente,
+  // onora il vecchio graph_color_by_temp per retrocompatibilita'.
+  _colorByValue() {
+    const c = this._config;
+    if (typeof c.color_by_value === 'boolean') return c.color_by_value;
+    if (typeof c.graph_color_by_temp === 'boolean') return c.graph_color_by_temp;
+    return true;
+  }
+
+  // Attributi con scala colore "di significato" (freddo/caldo o rischio UV).
+  _hasColorScale(attr) {
+    return attr === 'temperature' || attr === 'apparent_temperature'
+      || attr === 'dew_point' || attr === 'uv_index';
+  }
+
+  // Colore di un valore singolo secondo la scala dell'attributo.
+  _scaleColor(attr, v) {
+    return attr === 'uv_index' ? this._uvToColor(v) : this._tempToColor(v);
+  }
+
+  // Colore dell'indice UV secondo la scala standard OMS (a bande):
+  // basso=verde, moderato=giallo, alto=arancio, molto alto=rosso, estremo=viola.
+  _uvToColor(uv) {
+    const v = Math.max(0, Number(uv) || 0);
+    if (v < 3) return '#43a047';   // 0-2 basso
+    if (v < 6) return '#f9a825';   // 3-5 moderato
+    if (v < 8) return '#fb8c00';   // 6-7 alto
+    if (v < 11) return '#e53935';  // 8-10 molto alto
+    return '#8e24aa';              // 11+ estremo
   }
 
   _cloudPath() {
@@ -2475,6 +3051,39 @@ const ALL_DETAILS = [
   ['dew_point', 'Dew point'],
 ];
 const DETAIL_LABELS = Object.fromEntries(ALL_DETAILS);
+
+// Attributi del forecast selezionabili come linea del grafico (#7).
+// 'temperature' resta il default e mantiene il comportamento storico.
+const GRAPH_ATTRS = [
+  'temperature', 'apparent_temperature', 'dew_point', 'precipitation',
+  'precipitation_probability', 'humidity', 'pressure', 'wind_speed',
+  'cloud_coverage', 'uv_index',
+];
+// Chiave di traduzione per l'etichetta di ogni attributo nel menu del grafico:
+// 'temperature' ha una chiave propria (ga_temperature), gli altri riusano le
+// etichette gia' tradotte dei dettagli (det_*).
+const GRAPH_ATTR_LABEL_KEY = {
+  temperature: 'ga_temperature',
+  apparent_temperature: 'det_apparent_temperature',
+  dew_point: 'det_dew_point',
+  precipitation: 'det_precipitation',
+  precipitation_probability: 'det_precipitation_probability',
+  humidity: 'det_humidity',
+  pressure: 'det_pressure',
+  wind_speed: 'det_wind_speed',
+  cloud_coverage: 'det_cloud_coverage',
+  uv_index: 'det_uv_index',
+};
+// Etichette CORTE per le chip in-card (lo spazio e' poco): localizzate.
+const GRAPH_ATTR_SHORT = {
+  it: { temperature: 'Temp', apparent_temperature: 'Percepita', dew_point: 'Rugiada', precipitation: 'Pioggia', precipitation_probability: 'Prob. pioggia', humidity: 'Umidità', pressure: 'Pressione', wind_speed: 'Vento', cloud_coverage: 'Nuvole', uv_index: 'UV' },
+  en: { temperature: 'Temp', apparent_temperature: 'Feels like', dew_point: 'Dew pt', precipitation: 'Rain', precipitation_probability: 'Rain prob.', humidity: 'Humidity', pressure: 'Pressure', wind_speed: 'Wind', cloud_coverage: 'Clouds', uv_index: 'UV' },
+  de: { temperature: 'Temp', apparent_temperature: 'Gefühlt', dew_point: 'Taupunkt', precipitation: 'Regen', precipitation_probability: 'Regenw.', humidity: 'Feuchte', pressure: 'Druck', wind_speed: 'Wind', cloud_coverage: 'Wolken', uv_index: 'UV' },
+  nl: { temperature: 'Temp', apparent_temperature: 'Gevoel', dew_point: 'Dauwp.', precipitation: 'Regen', precipitation_probability: 'Regenkans', humidity: 'Vocht', pressure: 'Druk', wind_speed: 'Wind', cloud_coverage: 'Wolken', uv_index: 'UV' },
+  fr: { temperature: 'Temp', apparent_temperature: 'Ressenti', dew_point: 'Rosée', precipitation: 'Pluie', precipitation_probability: 'Prob. pluie', humidity: 'Humidité', pressure: 'Pression', wind_speed: 'Vent', cloud_coverage: 'Nuages', uv_index: 'UV' },
+  pl: { temperature: 'Temp', apparent_temperature: 'Odczuw.', dew_point: 'Rosa', precipitation: 'Deszcz', precipitation_probability: 'Pr. deszczu', humidity: 'Wilgotn.', pressure: 'Ciśnienie', wind_speed: 'Wiatr', cloud_coverage: 'Chmury', uv_index: 'UV' },
+  sv: { temperature: 'Temp', apparent_temperature: 'Känns', dew_point: 'Daggp.', precipitation: 'Regn', precipitation_probability: 'Regnrisk', humidity: 'Fukt', pressure: 'Tryck', wind_speed: 'Vind', cloud_coverage: 'Moln', uv_index: 'UV' },
+};
 const DETAIL_ICONS = {
   humidity: 'mdi:water-percent', pressure: 'mdi:gauge',
   wind_speed: 'mdi:weather-windy', wind_bearing: 'mdi:compass-outline',
@@ -2506,17 +3115,24 @@ const EDITOR_I18N = {
     current_temp_decimals: 'Current temperature decimals', ctd_0: 'Integer (17°)', ctd_1: 'One decimal (16.5°)',
     animated_icons: 'Animated icons',
     transparent: 'Transparent background',
+    background: 'Background',
     background_image: 'Background image (URL or /local/… path)',
+    background_css: 'Background colour / gradient (CSS)',
+    light_text: 'Light text (for dark backgrounds)',
     overlay: 'Overlay: lighter ⟵ none ⟶ darker',
     ov_lighter: 'Lighter', ov_zero: '0', ov_darker: 'Darker',
     forecast: 'Forecast',
     forecast_type: 'Forecast type',
     ft_daily: 'Daily', ft_hourly: 'Hourly',
     daily_layout: 'Daily layout',
-    dl_bars: 'Bars', dl_graph: 'Graph (lines)',
+    dl_bars: 'Bars', dl_graph: 'Graph (lines)', dl_none: 'None', dl_compact: 'Compact',
     forecast_temp_decimals: 'Forecast temperature decimals', ftd_0: 'Integers (22°)', ftd_1: 'One decimal (22.4°)',
-    graph_color_by_temp: 'Colour graph lines by temperature',
+    color_by_value: 'Dynamic colour (bars & graph)',
     graph_precip_bars: 'Show precipitation as bars in the graph',
+    forecast_attribute: 'Forecast attribute', ga_temperature: 'Temperature',
+    show_forecast_attribute_toggle: 'Show attribute selector in card',
+    forecast_attribute_toggle_style: 'Selector style', gats_dropdown: 'Dropdown', gats_chips: 'Chips',
+    forecast_attributes: 'Other attributes to offer (default always included)',
     days_to_load: 'Days to load',
     hours_to_load: 'Hours to load',
     visible_rows: 'Visible days (empty = all)',
@@ -2576,17 +3192,24 @@ const EDITOR_I18N = {
     current_temp_decimals: 'Decimali temperatura attuale', ctd_0: 'Intero (17°)', ctd_1: 'Un decimale (16,5°)',
     animated_icons: 'Icone animate',
     transparent: 'Sfondo trasparente',
+    background: 'Sfondo',
     background_image: 'Immagine di sfondo (URL o percorso /local/…)',
+    background_css: 'Colore / gradiente sfondo (CSS)',
+    light_text: 'Testo chiaro (per sfondi scuri)',
     overlay: 'Velo: più chiaro ⟵ niente ⟶ più scuro',
     ov_lighter: 'Chiaro', ov_zero: '0', ov_darker: 'Scuro',
     forecast: 'Previsioni',
     forecast_type: 'Tipo previsione',
     ft_daily: 'Giornaliera', ft_hourly: 'Oraria',
     daily_layout: 'Layout giornaliero',
-    dl_bars: 'Barre', dl_graph: 'Grafico (linee)',
+    dl_bars: 'Barre', dl_graph: 'Grafico (linee)', dl_none: 'Nessuno', dl_compact: 'Compatto',
     forecast_temp_decimals: 'Decimali temperature previsioni', ftd_0: 'Interi (22°)', ftd_1: 'Un decimale (22.4°)',
-    graph_color_by_temp: 'Colora le linee del grafico per temperatura',
+    color_by_value: 'Colore dinamico (barre e grafico)',
     graph_precip_bars: 'Mostra le precipitazioni come barre nel grafico',
+    forecast_attribute: 'Attributo previsione', ga_temperature: 'Temperatura',
+    show_forecast_attribute_toggle: 'Mostra selettore attributo nella card',
+    forecast_attribute_toggle_style: 'Stile selettore', gats_dropdown: 'Tendina', gats_chips: 'Chip',
+    forecast_attributes: 'Altri attributi da offrire (il default è sempre incluso)',
     days_to_load: 'Giorni da caricare',
     hours_to_load: 'Ore da caricare',
     visible_rows: 'Giorni visibili (vuoto = tutte)',
@@ -2646,17 +3269,24 @@ const EDITOR_I18N = {
     current_temp_decimals: 'Aktuelle Temperatur Dezimalstellen', ctd_0: 'Ganzzahl (17°)', ctd_1: 'Eine Dezimalstelle (16,5°)',
     animated_icons: 'Animierte Symbole',
     transparent: 'Transparenter Hintergrund',
+    background: 'Hintergrund',
     background_image: 'Hintergrundbild (URL oder /local/…-Pfad)',
+    background_css: 'Hintergrundfarbe / Verlauf (CSS)',
+    light_text: 'Heller Text (für dunkle Hintergründe)',
     overlay: 'Überlagerung: heller ⟵ keine ⟶ dunkler',
     ov_lighter: 'Heller', ov_zero: '0', ov_darker: 'Dunkler',
     forecast: 'Vorhersage',
     forecast_type: 'Vorhersagetyp',
     ft_daily: 'Täglich', ft_hourly: 'Stündlich',
     daily_layout: 'Tages-Layout',
-    dl_bars: 'Balken', dl_graph: 'Diagramm (Linien)',
+    dl_bars: 'Balken', dl_graph: 'Diagramm (Linien)', dl_none: 'Keine', dl_compact: 'Kompakt',
     forecast_temp_decimals: 'Nachkommastellen Vorhersagetemperatur', ftd_0: 'Ganzzahl (22°)', ftd_1: 'Eine Dezimalstelle (22,4°)',
-    graph_color_by_temp: 'Diagrammlinien nach Temperatur einfärben',
+    color_by_value: 'Dynamische Farbe (Balken & Diagramm)',
     graph_precip_bars: 'Niederschlag als Balken im Diagramm anzeigen',
+    forecast_attribute: 'Vorhersage-Attribut', ga_temperature: 'Temperatur',
+    show_forecast_attribute_toggle: 'Attribut-Auswahl in der Karte anzeigen',
+    forecast_attribute_toggle_style: 'Auswahl-Stil', gats_dropdown: 'Dropdown', gats_chips: 'Chips',
+    forecast_attributes: 'Weitere angebotene Attribute (Standard immer enthalten)',
     days_to_load: 'Zu ladende Tage',
     hours_to_load: 'Zu ladende Stunden',
     visible_rows: 'Sichtbare Tage (leer = alle)',
@@ -2716,17 +3346,24 @@ const EDITOR_I18N = {
     current_temp_decimals: 'Decimalen huidige temperatuur', ctd_0: 'Geheel (17°)', ctd_1: 'Één decimaal (16,5°)',
     animated_icons: 'Geanimeerde iconen',
     transparent: 'Transparante achtergrond',
+    background: 'Achtergrond',
     background_image: 'Achtergrondafbeelding (URL of /local/…-pad)',
+    background_css: 'Achtergrondkleur / verloop (CSS)',
+    light_text: 'Lichte tekst (voor donkere achtergronden)',
     overlay: 'Overlay: lichter ⟵ geen ⟶ donkerder',
     ov_lighter: 'Lichter', ov_zero: '0', ov_darker: 'Donkerder',
     forecast: 'Voorspelling',
     forecast_type: 'Voorspellingstype',
     ft_daily: 'Dagelijks', ft_hourly: 'Uurlijks',
     daily_layout: 'Dagelijkse layout',
-    dl_bars: 'Balken', dl_graph: 'Grafiek (lijnen)',
+    dl_bars: 'Balken', dl_graph: 'Grafiek (lijnen)', dl_none: 'Geen', dl_compact: 'Compact',
     forecast_temp_decimals: 'Decimalen voorspellingstemperatuur', ftd_0: 'Geheel (22°)', ftd_1: 'Één decimaal (22,4°)',
-    graph_color_by_temp: 'Grafieklijnen kleuren op temperatuur',
+    color_by_value: 'Dynamische kleur (balk & grafiek)',
     graph_precip_bars: 'Neerslag als balken in de grafiek tonen',
+    forecast_attribute: 'Voorspellingsattribuut', ga_temperature: 'Temperatuur',
+    show_forecast_attribute_toggle: 'Attribuutselectie in kaart tonen',
+    forecast_attribute_toggle_style: 'Selectiestijl', gats_dropdown: 'Dropdown', gats_chips: 'Chips',
+    forecast_attributes: 'Andere aangeboden attributen (standaard altijd inbegrepen)',
     days_to_load: 'Te laden dagen',
     hours_to_load: 'Te laden uren',
     visible_rows: 'Zichtbare dagen (leeg = alle)',
@@ -2786,17 +3423,24 @@ const EDITOR_I18N = {
     current_temp_decimals: 'Décimales température actuelle', ctd_0: 'Entier (17°)', ctd_1: 'Une décimale (16,5°)',
     animated_icons: 'Icônes animées',
     transparent: 'Fond transparent',
+    background: 'Arrière-plan',
     background_image: 'Image de fond (URL ou chemin /local/…)',
+    background_css: 'Couleur / dégradé de fond (CSS)',
+    light_text: 'Texte clair (pour fonds sombres)',
     overlay: 'Superposition : plus clair ⟵ aucun ⟶ plus foncé',
     ov_lighter: 'Plus clair', ov_zero: '0', ov_darker: 'Plus foncé',
     forecast: 'Prévision',
     forecast_type: 'Type de prévision',
     ft_daily: 'Quotidienne', ft_hourly: 'Horaire',
     daily_layout: 'Disposition quotidienne',
-    dl_bars: 'Barres', dl_graph: 'Graphique (lignes)',
+    dl_bars: 'Barres', dl_graph: 'Graphique (lignes)', dl_none: 'Aucun', dl_compact: 'Compact',
     forecast_temp_decimals: 'Décimales des températures de prévision', ftd_0: 'Entier (22°)', ftd_1: 'Une décimale (22,4°)',
-    graph_color_by_temp: 'Colorer les lignes du graphique selon la température',
+    color_by_value: 'Couleur dynamique (barres & graphique)',
     graph_precip_bars: 'Afficher les précipitations en barres dans le graphique',
+    forecast_attribute: 'Attribut de prévision', ga_temperature: 'Température',
+    show_forecast_attribute_toggle: 'Afficher le sélecteur d\'attribut dans la carte',
+    forecast_attribute_toggle_style: 'Style du sélecteur', gats_dropdown: 'Menu déroulant', gats_chips: 'Chips',
+    forecast_attributes: 'Autres attributs proposés (le défaut est toujours inclus)',
     days_to_load: 'Jours à charger',
     hours_to_load: 'Heures à charger',
     visible_rows: 'Jours visibles (vide = tous)',
@@ -2856,17 +3500,24 @@ const EDITOR_I18N = {
     current_temp_decimals: 'Miejsca dziesiętne aktualnej temperatury', ctd_0: 'Całkowita (17°)', ctd_1: 'Jeden dziesiętny (16,5°)',
     animated_icons: 'Animowane ikony',
     transparent: 'Przezroczyste tło',
+    background: 'Tło',
     background_image: 'Obraz tła (URL lub ścieżka /local/…)',
+    background_css: 'Kolor / gradient tła (CSS)',
+    light_text: 'Jasny tekst (dla ciemnych teł)',
     overlay: 'Nakładka: jaśniej ⟵ brak ⟶ ciemniej',
     ov_lighter: 'Jaśniej', ov_zero: '0', ov_darker: 'Ciemniej',
     forecast: 'Prognoza',
     forecast_type: 'Typ prognozy',
     ft_daily: 'Dzienna', ft_hourly: 'Godzinowa',
     daily_layout: 'Układ prognozy dziennej',
-    dl_bars: 'Słupki', dl_graph: 'Wykres (linie)',
+    dl_bars: 'Słupki', dl_graph: 'Wykres (linie)', dl_none: 'Brak', dl_compact: 'Kompaktowy',
     forecast_temp_decimals: 'Dziesiętne temperatury prognozy', ftd_0: 'Całkowite (22°)', ftd_1: 'Jeden dziesiętny (22,4°)',
-    graph_color_by_temp: 'Koloruj linie wykresu według temperatury',
+    color_by_value: 'Kolor dynamiczny (słupki i wykres)',
     graph_precip_bars: 'Pokaż opady jako słupki na wykresie',
+    forecast_attribute: 'Atrybut prognozy', ga_temperature: 'Temperatura',
+    show_forecast_attribute_toggle: 'Pokaż wybór atrybutu na karcie',
+    forecast_attribute_toggle_style: 'Styl selektora', gats_dropdown: 'Lista', gats_chips: 'Chipy',
+    forecast_attributes: 'Inne oferowane atrybuty (domyślny zawsze dołączony)',
     days_to_load: 'Liczba dni do wczytania',
     hours_to_load: 'Liczba godzin do wczytania',
     visible_rows: 'Widoczne dni (puste = wszystkie)',
@@ -2926,17 +3577,24 @@ const EDITOR_I18N = {
     current_temp_decimals: 'Decimaler för aktuell temperatur', ctd_0: 'Heltal (17°)', ctd_1: 'En decimal (16,5°)',
     animated_icons: 'Animerade ikoner',
     transparent: 'Genomskinlig bakgrund',
+    background: 'Bakgrund',
     background_image: 'Bakgrundsbild (URL eller /local/…-sökväg)',
+    background_css: 'Bakgrundsfärg / gradient (CSS)',
+    light_text: 'Ljus text (för mörka bakgrunder)',
     overlay: 'Överlägg: ljusare ⟵ inget ⟶ mörkare',
     ov_lighter: 'Ljusare', ov_zero: '0', ov_darker: 'Mörkare',
     forecast: 'Prognos',
     forecast_type: 'Prognostyp',
     ft_daily: 'Daglig', ft_hourly: 'Timvis',
     daily_layout: 'Daglig layout',
-    dl_bars: 'Staplar', dl_graph: 'Graf (linjer)',
+    dl_bars: 'Staplar', dl_graph: 'Graf (linjer)', dl_none: 'Ingen', dl_compact: 'Kompakt',
     forecast_temp_decimals: 'Decimaler för prognostemperatur', ftd_0: 'Heltal (22°)', ftd_1: 'En decimal (22,4°)',
-    graph_color_by_temp: 'Färga graflinjerna efter temperatur',
+    color_by_value: 'Dynamisk färg (staplar & graf)',
     graph_precip_bars: 'Visa nederbörd som staplar i grafen',
+    forecast_attribute: 'Prognosattribut', ga_temperature: 'Temperatur',
+    show_forecast_attribute_toggle: 'Visa attributväljare i kortet',
+    forecast_attribute_toggle_style: 'Väljarstil', gats_dropdown: 'Rullgardinsmeny', gats_chips: 'Chips',
+    forecast_attributes: 'Övriga attribut att visa (standard ingår alltid)',
     days_to_load: 'Antal dagar att visa',
     hours_to_load: 'Antal timmar att visa',
     visible_rows: 'Synliga dagar (tomt = alla)',
@@ -2998,6 +3656,7 @@ class SunWeatherCardEditor extends HTMLElement {
     } else {
       this._fillEntityPickers();
       this._fillAppearanceForm();
+      this._fillBackgroundForm();
       this._fillForecastForm();
       this._fillInteractionForm();
       this._fillDetailsForm();
@@ -3064,9 +3723,16 @@ class SunWeatherCardEditor extends HTMLElement {
       : this.t('current_temp_entity');
     form.addEventListener('value-changed', (e) => {
       const v = e.detail.value || {};
+      const prevEntity = this._config.entity;
       this._set('entity', v.entity);
       this._set('sun_entity', v.sun_entity);
       this._set('current_temp_entity', v.current_temp_entity || undefined);
+      // entita' meteo cambiata -> ricarica gli attributi disponibili del grafico
+      if (v.entity && v.entity !== prevEntity) {
+        this._graphAttrsFetched = false;
+        this._availGraphAttrs = null;
+        this._ensureGraphAttrs();
+      }
     });
     mount.appendChild(form);
     mount.dataset.filled = '1';
@@ -3090,8 +3756,6 @@ class SunWeatherCardEditor extends HTMLElement {
       show_sun_countdown: c.show_sun_countdown === true,
       current_temp_decimals: c.current_temp_decimals ?? 1,
       animated_icons: c.animated_icons !== false,
-      transparent: c.transparent === true,
-      background_image: c.background_image || '',
     };
     const sel = (opts) => ({ select: { mode: 'dropdown', options: opts } });
     form.schema = [
@@ -3123,8 +3787,6 @@ class SunWeatherCardEditor extends HTMLElement {
         { value: 1, label: this.t('ctd_1') },
       ]) },
       { name: 'animated_icons', selector: { boolean: {} } },
-      { name: 'transparent', selector: { boolean: {} } },
-      { name: 'background_image', selector: { text: {} } },
     ];
     const labels = {
       location: this.t('location'), language: this.t('language'),
@@ -3132,8 +3794,7 @@ class SunWeatherCardEditor extends HTMLElement {
       show_date: this.t('show_date'), sun_style: this.t('sun_style'),
       show_sun_countdown: this.t('sun_countdown'),
       current_temp_decimals: this.t('current_temp_decimals'),
-      animated_icons: this.t('animated_icons'), transparent: this.t('transparent'),
-      background_image: this.t('background_image'),
+      animated_icons: this.t('animated_icons'),
     };
     form.computeLabel = (s) => labels[s.name] || s.name;
     form.addEventListener('value-changed', (e) => {
@@ -3167,11 +3828,57 @@ class SunWeatherCardEditor extends HTMLElement {
     if (row) row.style.display = this._config.background_image ? '' : 'none';
   }
 
+  _fillBackgroundForm() {
+    if (!this.shadowRoot) return;
+    const mount = this.shadowRoot.getElementById('background-form');
+    if (!mount || mount.dataset.filled) return;
+    const c = this._config;
+
+    const form = document.createElement('ha-form');
+    form.hass = this._hass;
+    form.data = {
+      transparent: c.transparent === true,
+      background_image: c.background_image || '',
+      background_css: c.background_css || '',
+      light_text: c.light_text === true,
+    };
+    form.schema = [
+      { name: 'transparent', selector: { boolean: {} } },
+      { name: 'background_image', selector: { text: {} } },
+      { name: 'background_css', selector: { text: {} } },
+      { name: 'light_text', selector: { boolean: {} } },
+    ];
+    const labels = {
+      transparent: this.t('transparent'),
+      background_image: this.t('background_image'),
+      background_css: this.t('background_css'),
+      light_text: this.t('light_text'),
+    };
+    form.computeLabel = (s) => labels[s.name] || s.name;
+    form.addEventListener('value-changed', (e) => {
+      const v = e.detail.value || {};
+      // transparent e light_text spenti di default -> salva solo se true
+      this._set('transparent', v.transparent === true ? true : undefined);
+      this._set('background_image', v.background_image || undefined);
+      this._set('background_css', v.background_css || undefined);
+      this._set('light_text', v.light_text === true ? true : undefined);
+      this._updateOverlayVisibility();
+    });
+    mount.appendChild(form);
+    mount.dataset.filled = '1';
+    this._updateOverlayVisibility();
+  }
+
   _fillForecastForm() {
     if (!this.shadowRoot) return;
     const mount = this.shadowRoot.getElementById('forecast-form');
     if (!mount || mount.dataset.filled) return;
     const c = this._config;
+    // attributi disponibili e "altri" (tutti tranne il default): servono sia
+    // alle opzioni sia al valore iniziale della multiselezione
+    const attrListD = this._availGraphAttrs || GRAPH_ATTRS;
+    const defAttr = c.forecast_attribute || 'temperature';
+    const otherAttrsD = attrListD.filter((a) => a !== defAttr);
 
     const form = document.createElement('ha-form');
     form.hass = this._hass;
@@ -3179,7 +3886,14 @@ class SunWeatherCardEditor extends HTMLElement {
       forecast_type: c.forecast_type || 'daily',
       forecast_layout: c.forecast_layout || 'bars',
       forecast_temp_decimals: c.forecast_temp_decimals ?? 0,
-      graph_color_by_temp: c.graph_color_by_temp === true,
+      // valore effettivo del toggle colore (onora il vecchio graph_color_by_temp)
+      color_by_value: (typeof c.color_by_value === 'boolean') ? c.color_by_value
+        : (typeof c.graph_color_by_temp === 'boolean' ? c.graph_color_by_temp : true),
+      forecast_attribute: c.forecast_attribute || 'temperature',
+      show_forecast_attribute_toggle: c.show_forecast_attribute_toggle === true,
+      forecast_attribute_toggle_style: c.forecast_attribute_toggle_style === 'chips' ? 'chips' : 'dropdown',
+      // non configurato -> mostra tutti gli "altri" spuntati (= tutti disponibili)
+      forecast_attributes: Array.isArray(c.forecast_attributes) ? c.forecast_attributes : otherAttrsD,
       graph_precip_bars: c.graph_precip_bars === true,
       forecast_days: c.forecast_days ?? 7,
       forecast_hours: c.forecast_hours ?? 24,
@@ -3189,32 +3903,69 @@ class SunWeatherCardEditor extends HTMLElement {
     };
     const sel = (opts) => ({ select: { mode: 'dropdown', options: opts } });
     const num = (min, max) => ({ number: { min, max, mode: 'box', step: 1 } });
+    const isGraph = (c.forecast_layout || 'bars') === 'graph';
+    // layout 'none': la previsione e' nascosta -> non servono le sue opzioni
+    const noForecast = (c.forecast_layout || 'bars') === 'none';
+    // la tendina attributo elenca solo gli attributi presenti nelle previsioni
+    // dell'integrazione (come i dettagli). Finche' non e' noto -> lista completa.
+    const attrList = attrListD;
+    const otherAttrs = otherAttrsD;
+    // stile e lista attributi hanno senso solo se il selettore in-card e' attivo
+    const selOn = c.show_forecast_attribute_toggle === true;
+    // opzioni dell'attributo previsione: valgono per ENTRAMBI i layout
+    // (barre di livello e grafico a linee)
+    const attrOpts = [
+      // colora per valore: vale per barre E grafico
+      { name: 'color_by_value', selector: { boolean: {} } },
+      { name: 'forecast_attribute', selector: sel(attrList.map((a) => ({ value: a, label: this.t(GRAPH_ATTR_LABEL_KEY[a]) }))) },
+      { name: 'show_forecast_attribute_toggle', selector: { boolean: {} } },
+      ...(selOn ? [
+        { name: 'forecast_attribute_toggle_style', selector: sel([
+          { value: 'dropdown', label: this.t('gats_dropdown') },
+          { value: 'chips', label: this.t('gats_chips') },
+        ]) },
+        // altri attributi da offrire nel selettore in-card (oltre a quello di
+        // default, sempre incluso). Tutti spuntati = non salvato = tutti disponibili.
+        { name: 'forecast_attributes', selector: { select: { multiple: true, mode: 'list', options: otherAttrs.map((a) => ({ value: a, label: this.t(GRAPH_ATTR_LABEL_KEY[a]) })) } } },
+      ] : []),
+    ];
     form.schema = [
-      { name: 'forecast_type', selector: sel([
+      // con 'none' la previsione e' nascosta: resta solo il selettore layout
+      ...(noForecast ? [] : [{ name: 'forecast_type', selector: sel([
         { value: 'daily', label: this.t('ft_daily') },
         { value: 'hourly', label: this.t('ft_hourly') },
-      ]) },
+      ]) }]),
       { name: 'forecast_layout', selector: sel([
         { value: 'bars', label: this.t('dl_bars') },
         { value: 'graph', label: this.t('dl_graph') },
+        { value: 'compact', label: this.t('dl_compact') },
+        { value: 'none', label: this.t('dl_none') },
       ]) },
-      { name: 'forecast_temp_decimals', selector: sel([
-        { value: 0, label: this.t('ftd_0') },
-        { value: 1, label: this.t('ftd_1') },
-      ]) },
-      { name: 'graph_color_by_temp', selector: { boolean: {} } },
-      { name: 'visible_rows', selector: num(1, 15) },
-      { name: 'forecast_days', selector: num(1, 15) },
-      { name: 'forecast_hours', selector: num(1, 48) },
-      { name: 'show_forecast_precipitation', selector: { boolean: {} } },
-      { name: 'graph_precip_bars', selector: { boolean: {} } },
-      { name: 'show_forecast_toggle', selector: { boolean: {} } },
+      ...(noForecast ? [] : [
+        // attributo previsione + colore + selettore: subito sotto il layout
+        ...attrOpts,
+        { name: 'forecast_temp_decimals', selector: sel([
+          { value: 0, label: this.t('ftd_0') },
+          { value: 1, label: this.t('ftd_1') },
+        ]) },
+        { name: 'visible_rows', selector: num(1, 15) },
+        { name: 'forecast_days', selector: num(1, 15) },
+        { name: 'forecast_hours', selector: num(1, 48) },
+        { name: 'show_forecast_precipitation', selector: { boolean: {} } },
+        // pioggia come barre: specifica del grafico a linee
+        ...(isGraph ? [{ name: 'graph_precip_bars', selector: { boolean: {} } }] : []),
+        { name: 'show_forecast_toggle', selector: { boolean: {} } },
+      ]),
     ];
     const labels = {
       forecast_type: this.t('forecast_type'), forecast_layout: this.t('daily_layout'),
       forecast_temp_decimals: this.t('forecast_temp_decimals'),
-      graph_color_by_temp: this.t('graph_color_by_temp'),
+      color_by_value: this.t('color_by_value'),
       graph_precip_bars: this.t('graph_precip_bars'),
+      forecast_attribute: this.t('forecast_attribute'),
+      show_forecast_attribute_toggle: this.t('show_forecast_attribute_toggle'),
+      forecast_attribute_toggle_style: this.t('forecast_attribute_toggle_style'),
+      forecast_attributes: this.t('forecast_attributes'),
       forecast_days: this.t('days_to_load'), forecast_hours: this.t('hours_to_load'),
       visible_rows: this.t('visible_rows'),
       show_forecast_precipitation: this.t('show_rain'),
@@ -3223,12 +3974,29 @@ class SunWeatherCardEditor extends HTMLElement {
     form.computeLabel = (s) => labels[s.name] || s.name;
     form.addEventListener('value-changed', (e) => {
       const v = e.detail.value || {};
+      const prevLayout = this._config.forecast_layout || 'bars';
+      const prevType = this._config.forecast_type || 'daily';
+      const prevAttr = this._config.forecast_attribute || 'temperature';
+      const prevSelOn = this._config.show_forecast_attribute_toggle === true;
       this._set('forecast_type', v.forecast_type);
       this._set('forecast_layout', v.forecast_layout);
       this._set('forecast_temp_decimals', v.forecast_temp_decimals === 1 ? 1 : undefined);
-      // graph_color_by_temp e' spento di default: salva solo se true
-      this._set('graph_color_by_temp', v.graph_color_by_temp === true ? true : undefined);
+      // colore per valore: default true (colorato) -> salva solo se false.
+      // Migra via il vecchio graph_color_by_temp (lo rimuove).
+      this._set('graph_color_by_temp', undefined);
+      this._set('color_by_value', v.color_by_value === false ? false : undefined);
       this._set('graph_precip_bars', v.graph_precip_bars === true ? true : undefined);
+      // forecast_attribute: default 'temperature' -> non salvare (config pulita)
+      this._set('forecast_attribute', (v.forecast_attribute && v.forecast_attribute !== 'temperature') ? v.forecast_attribute : undefined);
+      // selettore attributo in-card: spento di default -> salva solo se true
+      this._set('show_forecast_attribute_toggle', v.show_forecast_attribute_toggle === true ? true : undefined);
+      // stile selettore: default 'dropdown' -> salva solo se 'chips'
+      this._set('forecast_attribute_toggle_style', v.forecast_attribute_toggle_style === 'chips' ? 'chips' : undefined);
+      // altri attributi offerti: se sono TUTTI quelli disponibili -> non salvare
+      // (= tutti, nuovi attributi inclusi da soli); altrimenti salva il sottoinsieme
+      // (anche vuoto: significa "solo il default", nessun selettore)
+      const chosenOthers = Array.isArray(v.forecast_attributes) ? v.forecast_attributes : [];
+      this._set('forecast_attributes', chosenOthers.length === otherAttrsD.length ? undefined : chosenOthers);
       this._set('forecast_days', v.forecast_days);
       this._set('forecast_hours', v.forecast_hours);
       // visible_rows: vuoto/null = mostra tutte
@@ -3237,9 +4005,63 @@ class SunWeatherCardEditor extends HTMLElement {
       this._set('show_forecast_precipitation', v.show_forecast_precipitation === false ? false : undefined);
       // show_toggle e' spento di default: salva solo se true
       this._set('show_forecast_toggle', v.show_forecast_toggle === true ? true : undefined);
+      const newLayout = this._config.forecast_layout || 'bars';
+      const newType = this._config.forecast_type || 'daily';
+      const newAttr = this._config.forecast_attribute || 'temperature';
+      const newSelOn = this._config.show_forecast_attribute_toggle === true;
+      // cambio layout, attributo di default o on/off del selettore -> ricostruisci
+      // il form (opzioni grafico, lista "altri attributi" e visibilita' dipendono)
+      if (newLayout !== prevLayout || newAttr !== prevAttr || newSelOn !== prevSelOn) {
+        this._rebuildForecastForm();
+      } else if (newType !== prevType) {
+        // cambio daily/hourly -> gli attributi disponibili possono differire
+        this._graphAttrsFetched = false;
+        this._ensureGraphAttrs();
+      }
     });
     mount.appendChild(form);
     mount.dataset.filled = '1';
+    // carica (una volta) gli attributi realmente presenti nelle previsioni e
+    // ricostruisce la tendina filtrata
+    this._ensureGraphAttrs();
+  }
+
+  // Ricostruisce il form previsioni (schema dinamico: opzioni grafico, tendina
+  // attributi filtrata). Serve perche' ha-form tiene lo schema fisso.
+  _rebuildForecastForm() {
+    const mount = this.shadowRoot && this.shadowRoot.getElementById('forecast-form');
+    if (!mount) return;
+    mount.innerHTML = '';
+    delete mount.dataset.filled;
+    this._fillForecastForm();
+  }
+
+  // Interroga una volta get_forecasts e tiene solo gli attributi (tra GRAPH_ATTRS)
+  // realmente forniti dall'integrazione; poi ricostruisce il form filtrato.
+  async _ensureGraphAttrs() {
+    if (this._graphAttrsFetched) return;
+    this._graphAttrsFetched = true;
+    const ent = this._config.entity;
+    if (!ent || !this._hass) return;
+    let fc = [];
+    try {
+      const r = await this._hass.callWS({
+        type: 'call_service', domain: 'weather', service: 'get_forecasts',
+        service_data: { type: this._config.forecast_type || 'daily' },
+        target: { entity_id: ent }, return_response: true,
+      });
+      fc = r?.response?.[ent]?.forecast || [];
+    } catch (err) {
+      fc = this._hass.states[ent]?.attributes?.forecast || [];
+    }
+    if (!fc.length) return;
+    const avail = GRAPH_ATTRS.filter((a) => a === 'temperature' || fc.some((d) => typeof d[a] === 'number'));
+    // ricostruisci solo se l'insieme e' cambiato
+    const prev = (this._availGraphAttrs || []).join(',');
+    if (avail.length && avail.join(',') !== prev) {
+      this._availGraphAttrs = avail;
+      this._rebuildForecastForm();
+    }
   }
 
   _fillInteractionForm() {
@@ -3543,14 +4365,6 @@ class SunWeatherCardEditor extends HTMLElement {
           <summary>${this.t('appearance')}</summary>
           <div class="grp-body">
             <div id="appearance-form"></div>
-            <div class="row" id="overlay-row" style="display:none;">
-              <label>${this.t('overlay')}</label>
-              <div class="ov-slider">
-                <span class="ov-tick"></span>
-                <input type="range" id="background_overlay" min="-1" max="1" step="0.05" value="${c.background_overlay ?? 0}">
-              </div>
-              <div class="ov-scale"><span>${this.t('ov_lighter')}</span><span>${this.t('ov_zero')}</span><span>${this.t('ov_darker')}</span></div>
-            </div>
           </div>
         </details>
 
@@ -3580,6 +4394,21 @@ class SunWeatherCardEditor extends HTMLElement {
         </details>
 
         <details class="group">
+          <summary>${this.t('background')}</summary>
+          <div class="grp-body">
+            <div id="background-form"></div>
+            <div class="row" id="overlay-row" style="display:none;">
+              <label>${this.t('overlay')}</label>
+              <div class="ov-slider">
+                <span class="ov-tick"></span>
+                <input type="range" id="background_overlay" min="-1" max="1" step="0.05" value="${c.background_overlay ?? 0}">
+              </div>
+              <div class="ov-scale"><span>${this.t('ov_lighter')}</span><span>${this.t('ov_zero')}</span><span>${this.t('ov_darker')}</span></div>
+            </div>
+          </div>
+        </details>
+
+        <details class="group">
           <summary>${this.t('interaction')}</summary>
           <div class="grp-body">
             <div id="interaction-form"></div>
@@ -3591,6 +4420,7 @@ class SunWeatherCardEditor extends HTMLElement {
 
     this._fillEntityPickers();
     this._fillAppearanceForm();
+    this._fillBackgroundForm();
     this._fillForecastForm();
     this._fillInteractionForm();
     this._fillDetailsForm();
@@ -3826,7 +4656,7 @@ window.customCards.push({
 });
 
 console.info(
-  '%c SUN-WEATHER-CARD %c 1.10.0 ',
+  `%c SUN-WEATHER-CARD %c ${CARD_VERSION} `,
   'color: white; background: #ff7a59; font-weight: 700;',
   'color: #ff7a59; background: #1c1c1c; font-weight: 700;'
 );

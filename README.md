@@ -52,11 +52,13 @@ Most weather cards on HACS show the forecast as a plain list. This card focuses 
 - 🌅 **Sunrise/sunset display** – shown as a curved **arc** or a flat **bar**, with the sun moving by day and the moon travelling the arc at night. Optional countdown to the next sunrise/sunset.
 - 📊 **Configurable details** – pick which attributes to show below the arc (humidity, pressure, wind, precipitation, UV, sunrise/sunset and more), shown as a tidy grid. Each attribute is shown only if your weather integration provides it.
 - 📅 **Daily & hourly forecast** – choose `daily` or `hourly`.
-- 📈 **Two layouts** – classic **bars** (iOS‑style temperature range bars) or a **graph** (smooth temperature line, with max/min lines for daily). In the graph, lines can optionally be colour‑coded by temperature and precipitation shown as bars.
+- 📈 **Four forecast layouts** – iOS‑style **bars**, a smooth **graph** (with max/min lines for daily), a slim **compact** strip, or **none** (keep just the day row). Precipitation can be shown as bars in the graph.
+- 🔎 **Plot any attribute** – show temperature, apparent temperature, dew point, humidity, pressure, wind speed, cloud cover, UV index, precipitation or precipitation probability on both the bars and the graph. An optional in‑card selector (dropdown or chips) lets viewers switch attribute on the fly.
+- 🌈 **Dynamic colouring** – colour the bars and graph by value: a cold→warm gradient for temperatures, the WHO scale for UV index, or a flat accent colour (one toggle for both).
 - 🎨 **Original animated SVG icons** for sun, moon, clouds, rain, snow, fog, wind and lightning. No external assets — animations can be turned off for lower-end devices.
-- 🖼️ **Transparent or image background** – make the card blend into your dashboard, or set a background image with an adjustable light/dark overlay for readability.
+- 🖼️ **Flexible background** – go transparent to blend into the dashboard, set a background image with an adjustable light/dark overlay, or apply a solid colour / CSS gradient — with a light‑text option for dark backgrounds.
 - 🔧 **Custom sensors** – add any entity (or a specific attribute of it, e.g. the sun's elevation or next dawn) to the details, with an optional name, icon and decimal rounding. Shown as a tidy 4‑column grid or a left‑aligned flow; names can be displayed under each value or on tap.
-- 🌍 **Multi‑language** – card content in Italian, English, German, Dutch, French or Polish, or follow your Home Assistant system language. The UI editor follows the card language.
+- 🌍 **Multi‑language** – card content in Italian, English, German, Dutch, French, Polish or Swedish, or follow your Home Assistant system language. The UI editor follows the card language.
 - 👆 **Tap / hold / double‑tap actions** – standard Home Assistant actions (more‑info, navigate, url, perform‑action, toggle).
 - 👁️ **Show only what you need** – time, date and the sun display (arc/bar/none) can each be turned on or off, and you choose exactly which detail attributes to display.
 - 🛠 **Visual editor** – configure everything without touching YAML.
@@ -122,7 +124,7 @@ All options can be set from the visual editor or in YAML.
 | `entity` | string | **required** | Your `weather.*` entity. |
 | `sun_entity` | string | `sun.sun` | Sun entity used for the sunrise/sunset arc. |
 | `location` | string | *auto* | Location name shown under the condition. Empty = taken automatically. |
-| `language` | string | `system` | Card language: `system`, `it`, `en`, `de`, `nl`, `fr` or `pl`. |
+| `language` | string | `system` | Card language: `system`, `it`, `en`, `de`, `nl`, `fr`, `pl` or `sv`. |
 | `time_format` | string | `24` | `24` or `12` hour clock. |
 | `show_time` | boolean | `true` | Show the clock. |
 | `show_date` | boolean | `true` | Show the date. |
@@ -135,9 +137,15 @@ All options can be set from the visual editor or in YAML.
 | `transparent` | boolean | `false` | Transparent background — the card blends into the dashboard (no background, border or shadow). |
 | `background_image` | string | *none* | Background image URL or `/local/…` path. |
 | `background_overlay` | number | `0` | Overlay over the background image, from `-1` (light) through `0` (none) to `1` (dark), for text readability. |
+| `background_css` | string | *none* | Solid colour or CSS gradient behind the card (e.g. `#1b2a4a` or `linear-gradient(135deg,#1a2a3a,#2d4a63)`). |
+| `light_text` | boolean | `false` | Switch all text to a light colour — for dark backgrounds. |
 | `forecast_type` | string | `daily` | `daily` or `hourly`. |
-| `forecast_layout` | string | `bars` | `bars` or `graph`. |
-| `graph_color_by_temp` | boolean | `false` | In the `graph` layout, colour the temperature lines by value (same scale as the bars) instead of the fixed orange/teal colours. |
+| `forecast_layout` | string | `bars` | `bars`, `graph`, `compact` (slim horizontal strip) or `none` (hide bars/graph, keep the day row). |
+| `forecast_attribute` | string | `temperature` | Which attribute the bars/graph plot: `temperature`, `apparent_temperature`, `dew_point`, `humidity`, `pressure`, `wind_speed`, `cloud_coverage`, `uv_index`, `precipitation` or `precipitation_probability`. |
+| `show_forecast_attribute_toggle` | boolean | `false` | Show an in‑card selector to switch the plotted attribute. |
+| `forecast_attribute_toggle_style` | string | `dropdown` | Selector style when the toggle is on: `dropdown` or `chips`. |
+| `forecast_attributes` | list | *all available* | Which attributes the selector offers; the `forecast_attribute` default is always included. |
+| `color_by_value` | boolean | `true` | Colour the bars and graph by value: temperature gradient, WHO scale for UV, flat accent colour otherwise. Off = flat accent colour. Replaces `graph_color_by_temp` (still honoured as a fallback). |
 | `graph_precip_bars` | boolean | `false` | In the `graph` layout, show precipitation as scaled bars instead of plain text labels. |
 | `forecast_days` | number | `7` | Number of days to load (daily). |
 | `forecast_hours` | number | `24` | Number of hours to load (hourly). |
@@ -202,7 +210,7 @@ language: system
 time_format: '24'
 forecast_type: daily
 forecast_layout: graph
-graph_color_by_temp: true
+color_by_value: true
 graph_precip_bars: true
 forecast_days: 7
 visible_rows: 5

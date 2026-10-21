@@ -3,6 +3,35 @@
 All notable changes to this project are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.12.0]
+
+### Added
+- **Choose which forecast attribute to plot** (`forecast_attribute`, #7) — the
+  daily/hourly forecast can now show any supported attribute (temperature,
+  apparent temperature, dew point, humidity, pressure, wind speed, cloud
+  coverage, UV index, precipitation, precipitation probability) on **both** the
+  bars and the line graph, not just temperature.
+- **In-card attribute selector** — optionally let viewers switch attribute
+  straight from the card (`show_forecast_attribute_toggle`), as a dropdown
+  (default) or chips (`forecast_attribute_toggle_style`). `forecast_attributes`
+  curates which attributes are offered; the default one is always included.
+- **Compact and None forecast layouts** (`forecast_layout`) — `compact` is a
+  slim horizontal strip (day, icon, max/min) that takes minimal vertical space;
+  `none` hides the bars/graph while keeping the day row (e.g. to show just the
+  week ahead). They join the existing `bars` and `graph`.
+- **Dynamic colouring for bars and graph** (`color_by_value`, on by default) —
+  one toggle colours both the bars and the graph by value: a cold→warm gradient
+  for temperature (and apparent temperature / dew point), the WHO colour scale
+  for UV index, and a flat accent colour for every other attribute. Turn it off
+  for flat accent-coloured bars and graph.
+- **Card background** — new Background section in the editor: `background_css`
+  sets a solid colour or CSS gradient behind the card, and `light_text` switches
+  all text to a light colour for dark backgrounds.
+
+### Changed
+- `graph_color_by_temp` is superseded by `color_by_value` (which now covers both
+  bars and graph). Existing configs keep working — the old key is still honoured.
+
 ## [1.11.1]
 
 ### Security
