@@ -82,13 +82,13 @@ The card automatically follows your Home Assistant theme — light or dark.
 
 ### HACS (recommended)
 
+Sun Weather Card is available in the default HACS store.
+
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=korova-sq&repository=sun-weather-card&category=plugin)
 
-1. Go to **HACS → Frontend**.
-2. Open the menu (⋮) → **Custom repositories**.
-3. Add this repository URL and select category **Lovelace / Dashboard**.
-4. Install **Sun Weather Card**.
-5. Reload your browser (hard refresh).
+1. Open **HACS** and search for **Sun Weather Card**.
+2. Open it and click **Download**.
+3. Reload your browser (hard refresh).
 
 ### Manual
 
