@@ -25,27 +25,6 @@ Sun Weather Card is a weather card for [Home Assistant](https://www.home-assista
 
 Most weather cards on HACS show the forecast as a plain list. This card focuses on a clean, iOS‑inspired look — with the sun's path, animated icons and a fully visual editor — designed for dashboards where you want the weather to look good and read instantly, without touching YAML.
 
-<br>
-
-<!--
-  SCREENSHOTS
-  Row 1: bars layout (daily + hourly). Row 2: graph layout (daily + hourly).
-  Grouping by layout keeps the proportions consistent within each row.
-  A light/dark pair is shown further down in the "Themes" section.
--->
-<table align="center">
-<tr>
-<td align="center" width="50%" valign="top"><img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/daily-bars.png" width="100%" /><br><b>📊 Daily forecast – bars</b></td>
-<td align="center" width="50%" valign="top"><img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/hourly-bars.png" width="100%" /><br><b>📊 Hourly forecast – bars</b></td>
-</tr>
-<tr>
-<td align="center" width="50%" valign="top"><img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/daily-graph.png" width="100%" /><br><b>📈 Daily forecast – graph</b></td>
-<td align="center" width="50%" valign="top"><img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/hourly-graph.png" width="100%" /><br><b>📈 Hourly forecast – graph</b></td>
-</tr>
-</table>
-
-<br>
-
 ## ✨ Features
 
 - 🌤️ **Current conditions header** – time, date, animated weather icon, current temperature, today's high/low and the location name.
@@ -65,16 +44,41 @@ Most weather cards on HACS show the forecast as a plain list. This card focuses 
 
 ---
 
-## Themes
+## 📸 Screenshots
+
+### Forecast — bars
+
+| | |
+|:---:|:---:|
+| <img src="images/01-daily-bars.png" width="250" /> | <img src="images/02-hourly-bars.png" width="250" /> |
+| Daily | Hourly |
+
+### Forecast — graph
+
+| | |
+|:---:|:---:|
+| <img src="images/03-daily-graph.png" width="250" /> | <img src="images/04-hourly-graph.png" width="250" /> |
+| Daily | Hourly |
+
+### Compact layout
+
+<img src="images/05-compact.png" width="250" />
+
+### Sun display — arc or bar
+
+| | |
+|:---:|:---:|
+| <img src="images/06-arc.png" width="250" /> | <img src="images/07-bar.png" width="250" /> |
+| Arc | Bar |
+
+### Themes
 
 The card automatically follows your Home Assistant theme — light or dark.
 
-<table align="center">
-<tr>
-<td align="center" width="50%" valign="top"><img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/theme-light.png" width="100%" /><br><b>☀️ Light theme</b></td>
-<td align="center" width="50%" valign="top"><img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/theme-dark.png" width="100%" /><br><b>🌙 Dark theme</b></td>
-</tr>
-</table>
+| | |
+|:---:|:---:|
+| <img src="images/08-theme-light.png" width="250" /> | <img src="images/09-theme-dark.png" width="250" /> |
+| ☀️ Light theme | 🌙 Dark theme |
 
 ---
 
