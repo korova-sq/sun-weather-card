@@ -251,6 +251,13 @@ If you enjoy this card and want to say thanks, a coffee is always welcome!
 
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-korova.sq-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/korova.sq)
 
+## 🃏 My other cards
+
+| Card | Description |
+|---|---|
+| [🗓 Calendar & Tasks Card](https://github.com/korova-sq/calendar-tasks-card) | Unified agenda — calendar events and todo tasks in one timeline |
+| [🕐 World Time Card](https://github.com/korova-sq/world-time-card) | Multiple world clocks with timezone support |
+
 ## License
 
 [MIT](LICENSE) © 2026 korova-sq
