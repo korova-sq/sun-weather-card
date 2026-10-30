@@ -3,6 +3,14 @@
 All notable changes to this project are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.12.1]
+
+### Changed
+- Documentation only: refreshed the README screenshots (now showing the compact
+  layout and the arc/bar sun display) and simplified the HACS install steps now
+  that the card is in the default HACS store. The screenshot images use absolute
+  URLs so they render inside HACS. No functional changes to the card itself.
+
 ## [1.12.0]
 
 ### Added

@@ -50,25 +50,25 @@ Most weather cards on HACS show the forecast as a plain list. This card focuses 
 
 | | |
 |:---:|:---:|
-| <img src="images/01-daily-bars.png" width="250" /> | <img src="images/02-hourly-bars.png" width="250" /> |
+| <img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/01-daily-bars.png" width="250" /> | <img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/02-hourly-bars.png" width="250" /> |
 | Daily | Hourly |
 
 ### Forecast — graph
 
 | | |
 |:---:|:---:|
-| <img src="images/03-daily-graph.png" width="250" /> | <img src="images/04-hourly-graph.png" width="250" /> |
+| <img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/03-daily-graph.png" width="250" /> | <img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/04-hourly-graph.png" width="250" /> |
 | Daily | Hourly |
 
 ### Compact layout
 
-<img src="images/05-compact.png" width="250" />
+<img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/05-compact.png" width="250" />
 
 ### Sun display — arc or bar
 
 | | |
 |:---:|:---:|
-| <img src="images/06-arc.png" width="250" /> | <img src="images/07-bar.png" width="250" /> |
+| <img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/06-arc.png" width="250" /> | <img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/07-bar.png" width="250" /> |
 | Arc | Bar |
 
 ### Themes
@@ -77,7 +77,7 @@ The card automatically follows your Home Assistant theme — light or dark.
 
 | | |
 |:---:|:---:|
-| <img src="images/08-theme-light.png" width="250" /> | <img src="images/09-theme-dark.png" width="250" /> |
+| <img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/08-theme-light.png" width="250" /> | <img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/09-theme-dark.png" width="250" /> |
 | ☀️ Light theme | 🌙 Dark theme |
 
 ---

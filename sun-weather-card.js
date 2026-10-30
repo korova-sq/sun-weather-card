@@ -1,7 +1,7 @@
 /**
  * Sun Weather Card
  * https://github.com/korova-sq/sun-weather-card
- * Version: 1.12.0
+ * Version: 1.12.1
  *
  * A weather card with an animated current-conditions header, a sunrise/sunset
  * arc, and daily/hourly forecasts shown as iOS-style bars or a line graph.
@@ -30,7 +30,7 @@
 // Versione della card: unico punto da aggiornare a ogni release (il banner in
 // console la legge da qui). Ricordarsi di allineare anche il commento "Version:"
 // in testa al file.
-const CARD_VERSION = '1.12.0';
+const CARD_VERSION = '1.12.1';
 
 // Lingue supportate: codice card -> locale usato per date/orari.
 const SUPPORTED_LANGS = {
