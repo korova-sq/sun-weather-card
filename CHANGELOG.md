@@ -3,6 +3,17 @@
 All notable changes to this project are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.13.0]
+
+### Added
+- **Portuguese (Portugal) translation** — card and editor fully translated to
+  pt-PT. Thanks @ChicoPaulo for the request and the translations (#15).
+
+### Fixed
+- The combined `wind` detail slot (speed + direction) now honours the per-item
+  `decimals` setting for the wind speed, consistent with the standalone
+  `wind_speed` attribute (#15).
+
 ## [1.12.1]
 
 ### Changed
