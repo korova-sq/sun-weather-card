@@ -940,7 +940,9 @@ class SunWeatherCard extends HTMLElement {
     // gestione chip attributo del grafico: cambia l'attributo tracciato al volo
     const chips = this.shadowRoot.getElementById('attr-chips');
     if (chips) {
+      chips.addEventListener('pointerdown', (ev) => ev.stopPropagation());
       chips.addEventListener('click', (ev) => {
+        ev.stopPropagation();
         const btn = ev.target.closest('button[data-attr]');
         if (!btn) return;
         const attr = btn.dataset.attr;
