@@ -34,7 +34,7 @@ const CARD_VERSION = '1.13.0';
 
 // Lingue supportate: codice card -> locale usato per date/orari.
 const SUPPORTED_LANGS = {
-  it: 'it-IT', en: 'en-GB', de: 'de-DE', nl: 'nl-NL', fr: 'fr-FR', pl: 'pl-PL', sv: 'sv-SE', pt: 'pt-PT',
+  it: 'it-IT', en: 'en-GB', de: 'de-DE', nl: 'nl-NL', fr: 'fr-FR', pl: 'pl-PL', sv: 'sv-SE', pt: 'pt-PT', ru: 'ru-RU',
 };
 
 // Da un locale ('it-IT') o codice ('it') ricava il codice lingua supportato.
@@ -189,6 +189,24 @@ const CONDITION_LABELS = {
     'windy-variant': 'Vento forte',
     exceptional: 'Evento excecional',
   },
+  ru: {
+    'clear-night': 'Ясно',
+    'partlycloudy-night': 'Переменная облачность',
+    cloudy: 'Пасмурно',
+    fog: 'Туман',
+    hail: 'Град',
+    lightning: 'Гроза',
+    'lightning-rainy': 'Гроза с дождём',
+    partlycloudy: 'Переменная облачность',
+    pouring: 'Ливень',
+    rainy: 'Дождь',
+    snowy: 'Снег',
+    'snowy-rainy': 'Мокрый снег',
+    sunny: 'Ясно',
+    windy: 'Ветрено',
+    'windy-variant': 'Ветрено',
+    exceptional: 'Особые условия',
+  },
 };
 
 const UI_LABELS = {
@@ -200,6 +218,7 @@ const UI_LABELS = {
   pl: { sunrise: 'wschód', sunset: 'zachód', daily: 'Dzienna', hourly: 'Godzinowa', sunset_in: 'Zachód za', sunrise_in: 'Wschód za', hm_join: ' ', no_data: 'Brak danych' },
   sv: { sunrise: 'soluppgång', sunset: 'solnedgång', daily: 'Daglig', hourly: 'Timvis', sunset_in: 'Solnedgång om', sunrise_in: 'Soluppgång om', hm_join: ' ', no_data: 'Ingen data tillgänglig' },
   pt: { sunrise: 'nascer do sol', sunset: 'pôr do sol', daily: 'Diário', hourly: 'Horário', sunset_in: 'Pôr do sol em', sunrise_in: 'Nascer do sol em', hm_join: ' ', no_data: 'Sem dados disponíveis' },
+  ru: { sunrise: 'восход', sunset: 'закат', daily: 'Дни', hourly: 'Часы', sunset_in: 'Закат через', sunrise_in: 'Восход через', hm_join: ' ', no_data: 'Данные недоступны' },
 };
 
 // Sigle bussola a 16 punti per lingua (le lettere cambiano: E/O in IT, E/W in EN...).
@@ -212,6 +231,7 @@ const WIND_DIRS = {
   fr: ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSO', 'SO', 'OSO', 'O', 'ONO', 'NO', 'NNO'],
   sv: ['N', 'NNO', 'NO', 'ONO', 'O', 'OSO', 'SO', 'SSO', 'S', 'SSV', 'SV', 'VSV', 'V', 'VNV', 'NV', 'NNV'],
   pt: ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSO', 'SO', 'OSO', 'O', 'ONO', 'NO', 'NNO'],
+  ru: ['С', 'ССВ', 'СВ', 'ВСВ', 'В', 'ВЮВ', 'ЮВ', 'ЮЮВ', 'Ю', 'ЮЮЗ', 'ЮЗ', 'ЗЮЗ', 'З', 'ЗСЗ', 'СЗ', 'ССЗ'],
 };
 
 class SunWeatherCard extends HTMLElement {
@@ -3112,6 +3132,7 @@ const GRAPH_ATTR_SHORT = {
   pl: { temperature: 'Temp', apparent_temperature: 'Odczuw.', dew_point: 'Rosa', precipitation: 'Deszcz', precipitation_probability: 'Pr. deszczu', humidity: 'Wilgotn.', pressure: 'Ciśnienie', wind_speed: 'Wiatr', cloud_coverage: 'Chmury', uv_index: 'UV' },
   sv: { temperature: 'Temp', apparent_temperature: 'Känns', dew_point: 'Daggp.', precipitation: 'Regn', precipitation_probability: 'Regnrisk', humidity: 'Fukt', pressure: 'Tryck', wind_speed: 'Vind', cloud_coverage: 'Moln', uv_index: 'UV' },
   pt: { temperature: 'Temp', apparent_temperature: 'Sensação', dew_point: 'Orvalho', precipitation: 'Chuva', precipitation_probability: 'Prob. chuva', humidity: 'Humidade', pressure: 'Pressão', wind_speed: 'Vento', cloud_coverage: 'Nuvens', uv_index: 'UV' },
+  ru: { temperature: 'Темп', apparent_temperature: 'Ощущение', dew_point: 'Точка росы', precipitation: 'Осадки', precipitation_probability: 'Осадки %', humidity: 'Влажность', pressure: 'Давление', wind_speed: 'Ветер', cloud_coverage: 'Облачность', uv_index: 'УФ', },
 };
 const DETAIL_ICONS = {
   humidity: 'mdi:water-percent', pressure: 'mdi:gauge',
@@ -3133,7 +3154,7 @@ const EDITOR_I18N = {
     appearance: 'Appearance',
     location: 'Location name (empty = automatic)',
     language: 'Language',
-    lang_system: 'System', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands', lang_fr: 'Français', lang_pl: 'Polski', lang_sv: 'Svenska', lang_pt: 'Português',
+    lang_system: 'System', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands', lang_fr: 'Français', lang_pl: 'Polski', lang_sv: 'Svenska', lang_pt: 'Português', lang_ru: 'Russian',
     time_format: 'Time format',
     tf_24: '24 hours', tf_12: '12 hours',
     show_time: 'Show time',
