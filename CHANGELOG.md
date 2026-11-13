@@ -3,6 +3,37 @@
 All notable changes to this project are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.14.0]
+
+### Added
+- **Dynamic weather background** (`weather_background`) — an optional sky-like
+  background generated from the current weather condition and the sun position
+  (day / night / golden hour), that dissolves softly into the card with a smooth
+  (eased) fade — no hard edge. Pick how far it extends from the editor: `header`,
+  `header_arc` (header + sun arc/bar) or `full` (whole card). Default is off
+  (`none`). The text colour switches automatically on dark skies, and a
+  `weather_background_inset` option adds a transparent margin for neumorphic /
+  inset themes.
+- **Weather animations** (`weather_background_animated`, off by default) — when
+  the background is on, an optional subtle animation layer matched to the
+  condition: falling rain, snow, drifting clouds and fog, twinkling stars at
+  night, a soft sun glow by day and a lightning flash. Confined to the sky
+  region (never over the data) and automatically disabled when the system
+  requests reduced motion.
+- **Russian (ru) translation** — card and editor fully translated to Russian.
+  Thanks @Barma-lej for the contribution (#17, #18).
+- **Slovak (sk) translation** — card and editor fully translated to Slovak.
+  Thanks @Havinko1991 for the contribution (#16).
+
+### Fixed
+- Forecast attribute chips no longer open the Home Assistant more-info dialog
+  when tapped. Thanks @Barma-lej (#18).
+- Daily forecast day labels (and today's high/low and precipitation) were off by
+  one in time zones west of UTC when the integration stamps each day at midnight
+  UTC (e.g. Open-Meteo). Daily entries are now read as a local calendar date, so
+  the weekday is correct in every time zone. Hourly forecasts are unchanged.
+  Thanks @iHateStupidPeople (#19).
+
 ## [1.13.0]
 
 ### Added

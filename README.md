@@ -2,7 +2,7 @@
 
 <br>
 
-[![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
+[![Marketplace](https://img.shields.io/badge/Marketplace-Default-41BDF5.svg)](https://www.home-assistant.io/integrations/marketplace)
 [![GitHub Release](https://img.shields.io/github/v/release/korova-sq/sun-weather-card)](https://github.com/korova-sq/sun-weather-card/releases)
 [![GitHub Stars](https://img.shields.io/github/stars/korova-sq/sun-weather-card?style=flat)](https://github.com/korova-sq/sun-weather-card/stargazers)
 [![Downloads](https://img.shields.io/github/downloads/korova-sq/sun-weather-card/total?style=flat&label=downloads)](https://github.com/korova-sq/sun-weather-card/releases)
@@ -36,8 +36,9 @@ Most weather cards on HACS show the forecast as a plain list. This card focuses 
 - 🌈 **Dynamic colouring** – colour the bars and graph by value: a cold→warm gradient for temperatures, the WHO scale for UV index, or a flat accent colour (one toggle for both).
 - 🎨 **Original animated SVG icons** for sun, moon, clouds, rain, snow, fog, wind and lightning. No external assets — animations can be turned off for lower-end devices.
 - 🖼️ **Flexible background** – go transparent to blend into the dashboard, set a background image with an adjustable light/dark overlay, or apply a solid colour / CSS gradient — with a light‑text option for dark backgrounds.
+- 🌇 **Dynamic weather background** – an optional sky that matches the current condition and time of day (clear, cloudy, rain, storm, snow, fog… plus day/night and golden hour), fading softly into the card. Choose how far it extends: just the header, header + sun arc, or the whole card.
 - 🔧 **Custom sensors** – add any entity (or a specific attribute of it, e.g. the sun's elevation or next dawn) to the details, with an optional name, icon and decimal rounding. Shown as a tidy 4‑column grid or a left‑aligned flow; names can be displayed under each value or on tap.
-- 🌍 **Multi‑language** – card content in Italian, English, German, Dutch, French, Polish, Swedish or Portuguese, or follow your Home Assistant system language. The UI editor follows the card language.
+- 🌍 **Multi‑language** – card content in Italian, English, German, Dutch, French, Polish, Swedish, Portuguese, Russian or Slovak, or follow your Home Assistant system language. The UI editor follows the card language.
 - 👆 **Tap / hold / double‑tap actions** – standard Home Assistant actions (more‑info, navigate, url, perform‑action, toggle).
 - 👁️ **Show only what you need** – time, date and the sun display (arc/bar/none) can each be turned on or off, and you choose exactly which detail attributes to display.
 - 🛠 **Visual editor** – configure everything without touching YAML.
@@ -84,11 +85,19 @@ The card automatically follows your Home Assistant theme — light or dark.
 
 ## Installation
 
-### HACS (recommended)
+### Marketplace / HACS (recommended)
 
-Sun Weather Card is available in the default HACS store.
+Sun Weather Card is available in the default store.
 
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=korova-sq&repository=sun-weather-card&category=plugin)
+
+**Home Assistant 2026.11 or newer** — HACS is now built into Home Assistant as the **Marketplace**:
+
+1. Open **Settings → Marketplace** and search for **Sun Weather Card**.
+2. Open it and click **Download**.
+3. Reload your browser (hard refresh).
+
+**Older versions (2026.10 or earlier)** — use **HACS**:
 
 1. Open **HACS** and search for **Sun Weather Card**.
 2. Open it and click **Download**.
@@ -128,7 +137,7 @@ All options can be set from the visual editor or in YAML.
 | `entity` | string | **required** | Your `weather.*` entity. |
 | `sun_entity` | string | `sun.sun` | Sun entity used for the sunrise/sunset arc. |
 | `location` | string | *auto* | Location name shown under the condition. Empty = taken automatically. |
-| `language` | string | `system` | Card language: `system`, `it`, `en`, `de`, `nl`, `fr`, `pl`, `sv` or `pt`. |
+| `language` | string | `system` | Card language: `system`, `it`, `en`, `de`, `nl`, `fr`, `pl`, `sv`, `pt`, `ru` or `sk`. |
 | `time_format` | string | `24` | `24` or `12` hour clock. |
 | `show_time` | boolean | `true` | Show the clock. |
 | `show_date` | boolean | `true` | Show the date. |
@@ -143,6 +152,9 @@ All options can be set from the visual editor or in YAML.
 | `background_overlay` | number | `0` | Overlay over the background image, from `-1` (light) through `0` (none) to `1` (dark), for text readability. |
 | `background_css` | string | *none* | Solid colour or CSS gradient behind the card (e.g. `#1b2a4a` or `linear-gradient(135deg,#1a2a3a,#2d4a63)`). |
 | `light_text` | boolean | `false` | Switch all text to a light colour — for dark backgrounds. |
+| `weather_background` | string | `none` | Dynamic sky background from the current condition + sun position. `none`, `header`, `header_arc` (header + sun arc/bar) or `full` (whole card). Dissolves into the card with a smooth fade; text colour adapts automatically. |
+| `weather_background_animated` | boolean | `false` | Add a subtle animation layer matched to the condition (rain, snow, clouds, fog, stars at night, sun glow, lightning). Requires `weather_background` to be set. Respects reduced-motion. |
+| `weather_background_inset` | number | `0` | Transparent margin (px) around the sky background, for neumorphic / inset themes. `0`–`40`. |
 | `forecast_type` | string | `daily` | `daily` or `hourly`. |
 | `forecast_layout` | string | `bars` | `bars`, `graph`, `compact` (slim horizontal strip) or `none` (hide bars/graph, keep the day row). |
 | `forecast_attribute` | string | `temperature` | Which attribute the bars/graph plot: `temperature`, `apparent_temperature`, `dew_point`, `humidity`, `pressure`, `wind_speed`, `cloud_coverage`, `uv_index`, `precipitation` or `precipitation_probability`. |

@@ -1,7 +1,7 @@
 /**
  * Sun Weather Card
  * https://github.com/korova-sq/sun-weather-card
- * Version: 1.13.0
+ * Version: 1.14.0
  *
  * A weather card with an animated current-conditions header, a sunrise/sunset
  * arc, and daily/hourly forecasts shown as iOS-style bars or a line graph.
@@ -30,11 +30,11 @@
 // Versione della card: unico punto da aggiornare a ogni release (il banner in
 // console la legge da qui). Ricordarsi di allineare anche il commento "Version:"
 // in testa al file.
-const CARD_VERSION = '1.13.0';
+const CARD_VERSION = '1.14.0';
 
 // Lingue supportate: codice card -> locale usato per date/orari.
 const SUPPORTED_LANGS = {
-  it: 'it-IT', en: 'en-GB', de: 'de-DE', nl: 'nl-NL', fr: 'fr-FR', pl: 'pl-PL', sv: 'sv-SE', pt: 'pt-PT',
+  it: 'it-IT', en: 'en-GB', de: 'de-DE', nl: 'nl-NL', fr: 'fr-FR', pl: 'pl-PL', sv: 'sv-SE', pt: 'pt-PT', ru: 'ru-RU', sk: 'sk-SK',
 };
 
 // Da un locale ('it-IT') o codice ('it') ricava il codice lingua supportato.
@@ -189,6 +189,42 @@ const CONDITION_LABELS = {
     'windy-variant': 'Vento forte',
     exceptional: 'Evento excecional',
   },
+  ru: {
+    'clear-night': 'Ясно',
+    'partlycloudy-night': 'Переменная облачность',
+    cloudy: 'Пасмурно',
+    fog: 'Туман',
+    hail: 'Град',
+    lightning: 'Гроза',
+    'lightning-rainy': 'Гроза с дождём',
+    partlycloudy: 'Переменная облачность',
+    pouring: 'Ливень',
+    rainy: 'Дождь',
+    snowy: 'Снег',
+    'snowy-rainy': 'Мокрый снег',
+    sunny: 'Ясно',
+    windy: 'Ветрено',
+    'windy-variant': 'Ветрено',
+    exceptional: 'Особые условия',
+  },
+  sk: {
+    'clear-night': 'Jasná noc',
+    'partlycloudy-night': 'Polojasná noc',
+    cloudy: 'Zamračené',
+    fog: 'Hmla',
+    hail: 'Krupobitie',
+    lightning: 'Búrka',
+    'lightning-rainy': 'Búrka s dažďom',
+    partlycloudy: 'Polojasno',
+    pouring: 'Prudký dážď',
+    rainy: 'Dážď',
+    snowy: 'Sneženie',
+    'snowy-rainy': 'Dážď so snehom',
+    sunny: 'Slnečno',
+    windy: 'Veterno',
+    'windy-variant': 'Silný vietor',
+    exceptional: 'Výnimočné podmienky',
+  },
 };
 
 const UI_LABELS = {
@@ -200,6 +236,8 @@ const UI_LABELS = {
   pl: { sunrise: 'wschód', sunset: 'zachód', daily: 'Dzienna', hourly: 'Godzinowa', sunset_in: 'Zachód za', sunrise_in: 'Wschód za', hm_join: ' ', no_data: 'Brak danych' },
   sv: { sunrise: 'soluppgång', sunset: 'solnedgång', daily: 'Daglig', hourly: 'Timvis', sunset_in: 'Solnedgång om', sunrise_in: 'Soluppgång om', hm_join: ' ', no_data: 'Ingen data tillgänglig' },
   pt: { sunrise: 'nascer do sol', sunset: 'pôr do sol', daily: 'Diário', hourly: 'Horário', sunset_in: 'Pôr do sol em', sunrise_in: 'Nascer do sol em', hm_join: ' ', no_data: 'Sem dados disponíveis' },
+  ru: { sunrise: 'восход', sunset: 'закат', daily: 'Дни', hourly: 'Часы', sunset_in: 'Закат через', sunrise_in: 'Восход через', hm_join: ' ', no_data: 'Данные недоступны' },
+  sk: { sunrise: 'Východ slnka', sunset: 'Západ slnka', daily: 'Dni', hourly: 'Hodiny', sunset_in: 'Do západu slnka:', sunrise_in: 'Do východu slnka:', hm_join: ' a ', no_data: 'Žiadne dostupné údaje' },
 };
 
 // Sigle bussola a 16 punti per lingua (le lettere cambiano: E/O in IT, E/W in EN...).
@@ -212,6 +250,8 @@ const WIND_DIRS = {
   fr: ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSO', 'SO', 'OSO', 'O', 'ONO', 'NO', 'NNO'],
   sv: ['N', 'NNO', 'NO', 'ONO', 'O', 'OSO', 'SO', 'SSO', 'S', 'SSV', 'SV', 'VSV', 'V', 'VNV', 'NV', 'NNV'],
   pt: ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSO', 'SO', 'OSO', 'O', 'ONO', 'NO', 'NNO'],
+  ru: ['С', 'ССВ', 'СВ', 'ВСВ', 'В', 'ВЮВ', 'ЮВ', 'ЮЮВ', 'Ю', 'ЮЮЗ', 'ЮЗ', 'ЗЮЗ', 'З', 'ЗСЗ', 'СЗ', 'ССЗ'],
+  sk: ['S', 'SSV', 'SV', 'VSV', 'V', 'VJV', 'JV', 'JJV', 'J', 'JJZ', 'JZ', 'ZJZ', 'Z', 'ZSZ', 'SZ', 'SSZ'],
 };
 
 class SunWeatherCard extends HTMLElement {
@@ -281,6 +321,15 @@ class SunWeatherCard extends HTMLElement {
       // velo sopra l'immagine di sfondo, valore unico da -1 a +1:
       //  -1 = chiaro pieno, 0 = nessun velo, +1 = scuro pieno.
       background_overlay: 0,
+      // sfondo meteo dinamico: 'none' | 'header' | 'header_arc' | 'full'.
+      // Cielo generato dalla condizione meteo + giorno/notte, con sfumatura.
+      weather_background: 'none',
+      // margine trasparente attorno al cielo (px): lascia vedere la cornice
+      // della card (es. temi neumorphic inset). 0 = cielo a filo bordo.
+      weather_background_inset: 0,
+      // animazioni meteo (pioggia, neve, nuvole, stelle...). Default off per
+      // leggerezza; rispetta "riduci movimento" del sistema.
+      weather_background_animated: false,
       // icone meteo animate: false = icone statiche (piu' leggere su
       // dispositivi lenti)
       animated_icons: true,
@@ -847,8 +896,50 @@ class SunWeatherCard extends HTMLElement {
           transform: translate(-50%, -50%);
           box-shadow: 0 0 3px rgba(0, 0, 0, 0.4);
         }
+        /* --- sfondo meteo dinamico (cielo per condizione) --- */
+        .weather-sky { position: absolute; top: var(--sky-inset, 0px); left: var(--sky-inset, 0px); right: var(--sky-inset, 0px); border-top-left-radius: var(--sky-radius, 0px); border-top-right-radius: var(--sky-radius, 0px); border-bottom-left-radius: var(--sky-radius-bottom, 0px); border-bottom-right-radius: var(--sky-radius-bottom, 0px); z-index: 0; pointer-events: none; -webkit-mask-image: var(--sky-mask); mask-image: var(--sky-mask); }
+        .weather-sky { --sky-mask: linear-gradient(to bottom, rgba(0,0,0,1.000) calc(100% - var(--sky-fade, 90px) * 1.0), rgba(0,0,0,0.972) calc(100% - var(--sky-fade, 90px) * 0.9), rgba(0,0,0,0.896) calc(100% - var(--sky-fade, 90px) * 0.8), rgba(0,0,0,0.784) calc(100% - var(--sky-fade, 90px) * 0.7), rgba(0,0,0,0.648) calc(100% - var(--sky-fade, 90px) * 0.6), rgba(0,0,0,0.500) calc(100% - var(--sky-fade, 90px) * 0.5), rgba(0,0,0,0.352) calc(100% - var(--sky-fade, 90px) * 0.4), rgba(0,0,0,0.216) calc(100% - var(--sky-fade, 90px) * 0.3), rgba(0,0,0,0.104) calc(100% - var(--sky-fade, 90px) * 0.2), rgba(0,0,0,0.028) calc(100% - var(--sky-fade, 90px) * 0.1), rgba(0,0,0,0.000) 100%); }
+        ha-card.has-sky { overflow: hidden; }
+        ha-card.has-sky > *:not(.weather-sky) { position: relative; z-index: 1; }
+        /* testo chiaro SOLO sulla zona coperta dal cielo (modalita' parziali) */
+        ha-card.sky-light-top .time, ha-card.sky-light-top .date,
+        ha-card.sky-light-top .cur-desc, ha-card.sky-light-top .cur-location,
+        ha-card.sky-light-top .cur-temp, ha-card.sky-light-top .cur-hilo { color: #ffffff; }
+        ha-card.sky-light-arc .sun-time-label, ha-card.sky-light-arc .sun-time-sub { fill: #ffffff; }
+        ha-card.sky-light-arc .arc-path { stroke: rgba(255,255,255,0.6); }
+        /* su cielo scuro schiarisci anche la linea orizzonte e la barra del sole */
+        ha-card.sky-light-arc .horizon-line,
+        ha-card.sky-light-arc .sun-bar-track { stroke: rgba(255,255,255,0.5); opacity: 1; }
+        /* su cielo chiaro (neve/nebbia) attenuala invece di schiarirla */
+        ha-card.sky-over-details:not(.sky-light-arc) .horizon-line,
+        ha-card.sky-over-details:not(.sky-light-arc) .sun-bar-track { opacity: 0.18; }
+        /* se la coda del cielo copre i dettagli, togli il bordo-separatore */
+        ha-card.sky-over-details .details,
+        ha-card.sky-over-details .forecast-list { border-top-color: transparent; }
+        /* --- animazioni meteo --- */
+        .weather-sky { overflow: hidden; }
+        .weather-fx { position: absolute; top: 0; left: 0; right: 0; overflow: hidden; pointer-events: none;
+          -webkit-mask-image: linear-gradient(to bottom, #000 72%, transparent); mask-image: linear-gradient(to bottom, #000 72%, transparent); }
+        .wfx-drop { position: absolute; top: -16px; width: 1.5px; background: linear-gradient(transparent, rgba(255,255,255,0.75)); border-radius: 1px; animation: wfx-fall linear infinite; }
+        @keyframes wfx-fall { to { transform: translateY(var(--fx-h, 200px)); } }
+        .wfx-flake { position: absolute; top: -10px; border-radius: 50%; background: #fff; animation: wfx-snow linear infinite; }
+        @keyframes wfx-snow { to { transform: translateY(var(--fx-h, 200px)) translateX(16px); } }
+        .wfx-star { position: absolute; border-radius: 50%; background: #fff; animation: wfx-twinkle ease-in-out infinite alternate; }
+        @keyframes wfx-twinkle { from { opacity: 0.15; } to { opacity: 1; } }
+        /* sole: due bagliori a dissolvenza sfasati (shimmer morbido, niente rotazione) */
+        .wfx-sun { position: absolute; top: -40px; right: 24px; width: 150px; height: 150px; border-radius: 50%; background: radial-gradient(circle, rgba(255,241,186,0.5), rgba(255,241,186,0) 70%); animation: wfx-glow 7s ease-in-out infinite; }
+        .wfx-sun2 { position: absolute; top: -20px; right: 10px; width: 120px; height: 120px; border-radius: 50%; background: radial-gradient(circle, rgba(255,247,214,0.5), rgba(255,247,214,0) 68%); animation: wfx-glow 7s ease-in-out infinite reverse; animation-delay: -2.2s; }
+        @keyframes wfx-glow { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.9; } }
+        .wfx-cloud { position: absolute; background: rgba(255,255,255,0.5); border-radius: 50%; filter: blur(7px); animation: wfx-drift linear infinite; }
+        @keyframes wfx-drift { from { transform: translateX(-150px); } to { transform: translateX(var(--fx-w, 360px)); } }
+        .wfx-haze { position: absolute; left: -30%; width: 160%; height: 26px; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent); filter: blur(7px); animation: wfx-haze linear infinite; }
+        @keyframes wfx-haze { from { transform: translateX(-60px); } to { transform: translateX(60px); } }
+        .wfx-bolt { position: absolute; inset: 0; background: radial-gradient(circle at 60% 15%, rgba(255,255,255,0.9), rgba(255,255,255,0) 60%); opacity: 0; animation: wfx-flash 7s infinite; }
+        @keyframes wfx-flash { 0%, 100% { opacity: 0; } 2% { opacity: 0.9; } 4% { opacity: 0.15; } 6% { opacity: 0.8; } 9% { opacity: 0; } }
+        @media (prefers-reduced-motion: reduce) { .wfx-drop, .wfx-flake, .wfx-star, .wfx-cloud, .wfx-haze, .wfx-bolt, .wfx-sun, .wfx-sun2 { animation: none; } }
       </style>
       <ha-card>
+        <div class="weather-sky" id="weather-sky" style="display:none"><div class="weather-fx" id="weather-fx"></div></div>
         <div class="header">
           <div class="time" id="time"></div>
           <div class="date" id="date"></div>
@@ -920,7 +1011,9 @@ class SunWeatherCard extends HTMLElement {
     // gestione chip attributo del grafico: cambia l'attributo tracciato al volo
     const chips = this.shadowRoot.getElementById('attr-chips');
     if (chips) {
+      chips.addEventListener('pointerdown', (ev) => ev.stopPropagation());
       chips.addEventListener('click', (ev) => {
+        ev.stopPropagation();
         const btn = ev.target.closest('button[data-attr]');
         if (!btn) return;
         const attr = btn.dataset.attr;
@@ -1277,6 +1370,60 @@ class SunWeatherCard extends HTMLElement {
       }
       // testo chiaro: automatico (velo scuro forte su immagine) o forzato da light_text
       cardEl.classList.toggle('bg-dark', lightText || autoDark);
+
+      // --- sfondo meteo dinamico ---
+      const skyMode = cfg.weather_background || 'none';
+      const skyEl = this.shadowRoot.getElementById('weather-sky');
+      const wStateSky = this._hass.states[cfg.entity];
+      if (skyEl) {
+        if (skyMode !== 'none' && wStateSky) {
+          const sky = this._weatherSky(wStateSky.state, this._isNight(now), now);
+          skyEl.style.display = '';
+          skyEl.style.background = sky.bg;
+          const skyInset = Math.max(0, Number(cfg.weather_background_inset) || 0);
+          skyEl.style.setProperty('--sky-inset', skyInset + 'px');
+          // raggio concentrico: segue il raggio reale della card meno il margine
+          const cardR = parseFloat(getComputedStyle(cardEl).borderTopLeftRadius) || 12;
+          const skyR = Math.max(0, cardR - skyInset);
+          skyEl.style.setProperty('--sky-radius', skyR + 'px');
+          // angoli inferiori tondi solo quando il cielo arriva al fondo card
+          // (Completa); in Header/Header+arco il fondo e' dritto perche' sfuma
+          skyEl.style.setProperty('--sky-radius-bottom', (skyMode === 'full' ? skyR : 0) + 'px');
+          cardEl.classList.add('has-sky');
+          // quando la coda del cielo scende sui dettagli, nascondi la lineetta
+          // di separazione (altrimenti taglia la dissolvenza)
+          cardEl.classList.toggle('sky-over-details', skyMode === 'header_arc' || skyMode === 'full');
+          if (skyMode === 'full') {
+            // card interamente cielo: testo chiaro globale come per bg scuro
+            cardEl.classList.toggle('bg-dark', sky.light);
+            cardEl.classList.remove('sky-light-top', 'sky-light-arc');
+          } else {
+            // modalita' parziali: schiarisci solo la zona sul cielo
+            cardEl.classList.toggle('sky-light-top', sky.light);
+            cardEl.classList.toggle('sky-light-arc', sky.light && skyMode === 'header_arc');
+          }
+          const fxEl = this.shadowRoot.getElementById('weather-fx');
+          if (fxEl) {
+            if (cfg.weather_background_animated === true) {
+              const fnight = this._isNight(now);
+              let fc = wStateSky.state;
+              if (fnight && fc === 'sunny') fc = 'clear-night';
+              else if (!fnight && fc === 'clear-night') fc = 'sunny';
+              if (fxEl.dataset.sig !== fc) { this._buildFx(fxEl, fc); fxEl.dataset.sig = fc; }
+              fxEl.style.display = '';
+            } else {
+              fxEl.style.display = 'none';
+              if (fxEl.dataset.sig) { fxEl.innerHTML = ''; fxEl.dataset.sig = ''; }
+            }
+          }
+          this._measureSky(cardEl, skyEl, skyMode);
+        } else {
+          skyEl.style.display = 'none';
+          cardEl.classList.remove('has-sky', 'sky-light-top', 'sky-light-arc', 'sky-over-details');
+          const fxOff = this.shadowRoot.getElementById('weather-fx');
+          if (fxOff) { fxOff.style.display = 'none'; fxOff.dataset.sig = ''; fxOff.innerHTML = ''; }
+        }
+      }
     }
 
     timeEl.textContent = timeFmt.format(now);
@@ -1335,6 +1482,141 @@ class SunWeatherCard extends HTMLElement {
       if (condition === 'partlycloudy-night') return 'partlycloudy';
     }
     return condition;
+  }
+
+  // Sfondo meteo dinamico: gradiente "cielo" per la condizione + giorno/notte,
+  // con ore dorate vicino ad alba/tramonto. Ritorna { bg, light }.
+  _weatherSky(cond, night, now) {
+    const G = {
+      day:      { bg: 'linear-gradient(175deg,#2f7fd1 0%,#59a7e6 45%,#bfe3fb 100%)', light: true },
+      night:    { bg: 'linear-gradient(175deg,#070b1e 0%,#141e3c 50%,#283a66 100%)', light: true },
+      twilight: { bg: 'linear-gradient(175deg,#2b2f6b 0%,#6a4a8f 40%,#e4663b 78%,#ffb561 100%)', light: true },
+      partly:   { bg: 'linear-gradient(175deg,#4d7fb3 0%,#7aa6cf 50%,#cdd9e6 100%)', light: true },
+      partlyN:  { bg: 'linear-gradient(175deg,#0c1430 0%,#1d2b4d 55%,#38476b 100%)', light: true },
+      cloudy:   { bg: 'linear-gradient(175deg,#737f8d 0%,#9aa6b3 55%,#cbd2da 100%)', light: true },
+      cloudyN:  { bg: 'linear-gradient(175deg,#2a313c 0%,#444d59 55%,#5f6975 100%)', light: true },
+      rain:     { bg: 'linear-gradient(175deg,#3c4857 0%,#566374 55%,#7c8a99 100%)', light: true },
+      storm:    { bg: 'linear-gradient(175deg,#191d2b 0%,#363c54 50%,#565b73 100%)', light: true },
+      snow:     { bg: 'linear-gradient(175deg,#9fb0c2 0%,#c6d2de 55%,#eef3f8 100%)', light: false },
+      fog:      { bg: 'linear-gradient(175deg,#9aa0a8 0%,#bcc2c8 55%,#dde1e5 100%)', light: false },
+    };
+    const clear = cond === 'sunny' || cond === 'clear-night'
+      || cond === 'partlycloudy' || cond === 'partlycloudy-night';
+    if (clear && this._nearSunEvent(now)) return G.twilight;
+    switch (cond) {
+      case 'sunny': return night ? G.night : G.day;
+      case 'clear-night': return G.night;
+      case 'partlycloudy': return night ? G.partlyN : G.partly;
+      case 'partlycloudy-night': return G.partlyN;
+      case 'cloudy': return night ? G.cloudyN : G.cloudy;
+      case 'rainy': case 'pouring': case 'hail': case 'snowy-rainy': return G.rain;
+      case 'lightning': case 'lightning-rainy': return G.storm;
+      case 'snowy': return G.snow;
+      case 'fog': return G.fog;
+      case 'windy': case 'windy-variant': return night ? G.cloudyN : G.cloudy;
+      case 'exceptional': return night ? G.cloudyN : G.cloudy;
+      default: return night ? G.night : G.day;
+    }
+  }
+
+  // true se siamo entro ~55 min prima del prossimo sorgere/tramontare del sole.
+  _nearSunEvent(now) {
+    const st = this._hass.states[this._config.sun_entity || 'sun.sun'];
+    if (!st || !st.attributes) return false;
+    const mins = (iso) => (iso ? (new Date(iso) - now) / 60000 : Infinity);
+    const above = st.state === 'above_horizon';
+    const d = above ? mins(st.attributes.next_setting) : mins(st.attributes.next_rising);
+    return d > -5 && d < 55;
+  }
+
+  // Popola il livello animazioni in base alla condizione (gia' normalizzata
+  // giorno/notte). Particelle in CSS, nessuna immagine esterna.
+  _buildFx(fxEl, cond) {
+    const rnd = (a, b) => a + Math.random() * (b - a);
+    const f = (x) => x.toFixed(2);
+    const P = [];
+    const drops = (n) => { for (let i = 0; i < n; i++) P.push(`<span class="wfx-drop" style="left:${f(rnd(0, 100))}%;height:${f(rnd(10, 20))}px;animation-duration:${f(rnd(0.45, 0.9))}s;animation-delay:${f(rnd(0, 1))}s;opacity:${f(rnd(0.4, 0.9))}"></span>`); };
+    if (cond === 'rainy' || cond === 'pouring' || cond === 'hail' || cond === 'snowy-rainy') {
+      drops(46);
+    } else if (cond === 'lightning' || cond === 'lightning-rainy') {
+      drops(38); P.push('<span class="wfx-bolt"></span>');
+    } else if (cond === 'snowy') {
+      for (let i = 0; i < 34; i++) { const z = f(rnd(3, 6)); P.push(`<span class="wfx-flake" style="left:${f(rnd(0, 100))}%;width:${z}px;height:${z}px;animation-duration:${f(rnd(4, 9))}s;animation-delay:${f(rnd(0, 5))}s;opacity:${f(rnd(0.5, 0.95))}"></span>`); }
+    } else if (cond === 'clear-night') {
+      for (let i = 0; i < 40; i++) { const z = f(rnd(1, 2.6)); P.push(`<span class="wfx-star" style="left:${f(rnd(2, 98))}%;top:${f(rnd(6, 80))}%;width:${z}px;height:${z}px;animation-duration:${f(rnd(1.4, 3.2))}s;animation-delay:${f(rnd(0, 3))}s"></span>`); }
+      // niente luna decorativa: l'icona della condizione fa gia' la luna
+    } else if (cond === 'sunny') {
+      P.push('<span class="wfx-sun"></span>');
+      P.push('<span class="wfx-sun2"></span>');
+    } else if (cond === 'fog') {
+      P.push('<span class="wfx-haze" style="top:35%;animation-duration:13s"></span>');
+      P.push('<span class="wfx-haze" style="top:62%;animation-duration:18s;animation-delay:-6s"></span>');
+    } else if (cond === 'cloudy' || cond === 'partlycloudy' || cond === 'partlycloudy-night'
+      || cond === 'windy' || cond === 'windy-variant' || cond === 'exceptional') {
+      const n = (cond === 'cloudy' || cond === 'exceptional') ? 4 : 3;
+      for (let i = 0; i < n; i++) { P.push(`<span class="wfx-cloud" style="width:${f(rnd(90, 160))}px;height:${f(rnd(26, 44))}px;top:${f(rnd(4, 55))}%;animation-duration:${f(rnd(26, 55))}s;animation-delay:${f(-rnd(0, 40))}s"></span>`); }
+    }
+    fxEl.innerHTML = P.join('');
+  }
+
+  // Dimensiona il cielo in base all'estensione scelta e applica la sfumatura.
+  _measureSky(cardEl, skyEl, mode) {
+    // La dissolvenza (fade) si COMPLETA esattamente sul bordo di ancoraggio: i
+    // dati sotto restano su sfondo pulito. "tail" fa sforare la dissolvenza oltre
+    // il bordo (0 = trasparente esatto sul bordo). La sfumatura viene poi limitata
+    // all'altezza reale del cielo (vedi "effFade"): altrimenti, se fade supera
+    // l'altezza, lo stop della maschera va negativo e Safari/iOS disegna un taglio
+    // netto invece della dissolvenza.
+    const fade = 90;
+    const tail = 40;
+    const inset = Math.max(0, Number(this._config.weather_background_inset) || 0);
+    const q = (sel) => this.shadowRoot.querySelector(sel);
+    const run = () => {
+      const cr = cardEl.getBoundingClientRect();
+      // un elemento vale come riferimento solo se davvero renderizzato:
+      // sun_style:none rende .arc-wrap display:none (e .details:empty idem), ma
+      // getBoundingClientRect() di un display:none restituisce 0 -> cielo e
+      // animazioni collasserebbero. getClientRects().length===0 => non renderizzato.
+      const shown = (el) => el && el.getClientRects().length > 0;
+      const topOf = (sel) => { const el = q(sel); return shown(el) ? el.getBoundingClientRect().top : null; };
+      const botOf = (sel) => { const el = q(sel); return shown(el) ? el.getBoundingClientRect().bottom : null; };
+      if (mode === 'full') {
+        skyEl.style.height = '';
+        skyEl.style.bottom = inset + 'px';
+        skyEl.style.setProperty('--sky-fade', '0px');
+      } else {
+        skyEl.style.bottom = '';
+        // Il cielo FINISCE a un bordo DOM misurato dal vivo (adatto a ogni
+        // tema/dispositivo): Header -> inizio dell'arco; Header+arco -> inizio
+        // dei dettagli. Fallback se l'elemento manca (es. sun_style: none).
+        let tb;
+        if (mode === 'header_arc') {
+          tb = topOf('.details') ?? topOf('.custom-details') ?? topOf('.forecast-list')
+               ?? botOf('.arc-wrap') ?? botOf('.current') ?? cr.top;
+        } else {
+          tb = topOf('.arc-wrap') ?? botOf('.current') ?? cr.top;
+        }
+        const h = Math.max(0, (tb - cr.top) - inset) + tail;
+        skyEl.style.height = h + 'px';
+        // mai piu' lunga dell'altezza del cielo (evita stop negativo su iOS)
+        const effFade = Math.min(fade, h);
+        skyEl.style.setProperty('--sky-fade', effFade + 'px');
+      }
+      // animazioni: tetto all'header (o arco), mai piu' in basso. Se l'arco e'
+      // tolto (display:none) si ripiega su .current, altrimenti l'altezza
+      // collasserebbe e le particelle (stelle, ecc.) sparirebbero.
+      const fxEl = this.shadowRoot.getElementById('weather-fx');
+      if (fxEl) {
+        const cb = (mode === 'header')
+          ? (botOf('.current') ?? cr.top)
+          : (botOf('.arc-wrap') ?? botOf('.current') ?? cr.top);
+        const fxh = Math.max(0, (cb - cr.top) - inset);
+        fxEl.style.height = fxh + 'px';
+        fxEl.style.setProperty('--fx-h', fxh + 'px');
+        fxEl.style.setProperty('--fx-w', (skyEl.clientWidth || cr.width) + 'px');
+      }
+    };
+    requestAnimationFrame(run);
   }
 
   // Risolve la lingua scelta in un locale effettivo.
@@ -1450,7 +1732,7 @@ class SunWeatherCard extends HTMLElement {
     if (this._daily && this._daily.length) {
       const todayStr = now.toDateString();
       const todayEntry =
-        this._daily.find((d) => new Date(d.datetime).toDateString() === todayStr) ||
+        this._daily.find((d) => this._dayDate(d).toDateString() === todayStr) ||
         this._daily[0];
       if (todayEntry) {
         const hi = todayEntry.temperature;
@@ -1519,6 +1801,16 @@ class SunWeatherCard extends HTMLElement {
     return raw;
   }
 
+  // Per le voci GIORNALIERE: data di calendario COSI' COM'E' SCRITTA
+  // (YYYY-MM-DD), senza conversione di fuso. Le integrazioni marcano il giorno
+  // a mezzanotte UTC (es. Open-Meteo) o locale; convertire il timestamp pieno
+  // in ora locale sfasa l'etichetta di un giorno nei fusi a ovest di UTC (#19).
+  // L'oraria (hourly) continua a usare new Date(d.datetime): le serve l'ora.
+  _dayDate(d) {
+    const m = typeof d.datetime === 'string' && d.datetime.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date(d.datetime);
+  }
+
   // Converte i gradi bussola in sigla a 16 punti nella lingua attiva
   _bearingToText(deg) {
     const dirs = WIND_DIRS[langCode(this._locale())] || WIND_DIRS.en;
@@ -1564,7 +1856,7 @@ class SunWeatherCard extends HTMLElement {
     if (this._daily && this._daily.length) {
       const todayStr = new Date().toDateString();
       today = this._daily.find(
-        (d) => new Date(d.datetime).toDateString() === todayStr
+        (d) => this._dayDate(d).toDateString() === todayStr
       ) || this._daily[0];
     }
 
@@ -2048,7 +2340,7 @@ class SunWeatherCard extends HTMLElement {
 
     const dayFmt = new Intl.DateTimeFormat(this._locale(), { weekday: 'short' });
     const hourFmt = new Intl.DateTimeFormat(this._locale(), { hour: 'numeric', hour12: this._config.time_format === '12' });
-    const colLabel = (d) => hourly ? hourFmt.format(new Date(d.datetime)) : dayFmt.format(new Date(d.datetime));
+    const colLabel = (d) => hourly ? hourFmt.format(new Date(d.datetime)) : dayFmt.format(this._dayDate(d));
 
     // larghezza colonna: come il grafico, dalla larghezza misurata del contenitore
     this._ensureGraphResizeObserver(list);
@@ -2155,7 +2447,7 @@ class SunWeatherCard extends HTMLElement {
 
     list.innerHTML = days
       .map((d) => {
-        const date = new Date(d.datetime);
+        const date = this._dayDate(d);
         const label = dayFmt.format(date);
         this._iconUid += 1;
         const icon = this._icon(d.condition, this._iconUid, 28);
@@ -2374,7 +2666,7 @@ class SunWeatherCard extends HTMLElement {
     });
     const colLabel = (d) => hourly
       ? hourFmt.format(new Date(d.datetime))
-      : dayFmt.format(new Date(d.datetime));
+      : dayFmt.format(this._dayDate(d));
 
     // Attributo tracciato (#7): 'temperature' = comportamento storico (banda
     // max/min nel daily, scala colore, etichette in °). Ogni altro attributo =
@@ -3112,6 +3404,8 @@ const GRAPH_ATTR_SHORT = {
   pl: { temperature: 'Temp', apparent_temperature: 'Odczuw.', dew_point: 'Rosa', precipitation: 'Deszcz', precipitation_probability: 'Pr. deszczu', humidity: 'Wilgotn.', pressure: 'Ciśnienie', wind_speed: 'Wiatr', cloud_coverage: 'Chmury', uv_index: 'UV' },
   sv: { temperature: 'Temp', apparent_temperature: 'Känns', dew_point: 'Daggp.', precipitation: 'Regn', precipitation_probability: 'Regnrisk', humidity: 'Fukt', pressure: 'Tryck', wind_speed: 'Vind', cloud_coverage: 'Moln', uv_index: 'UV' },
   pt: { temperature: 'Temp', apparent_temperature: 'Sensação', dew_point: 'Orvalho', precipitation: 'Chuva', precipitation_probability: 'Prob. chuva', humidity: 'Humidade', pressure: 'Pressão', wind_speed: 'Vento', cloud_coverage: 'Nuvens', uv_index: 'UV' },
+  ru: { temperature: 'Темп', apparent_temperature: 'Ощущение', dew_point: 'Точка росы', precipitation: 'Осадки', precipitation_probability: 'Осадки %', humidity: 'Влажность', pressure: 'Давление', wind_speed: 'Ветер', cloud_coverage: 'Облачность', uv_index: 'УФ', },
+  sk: { temperature: 'Tepl.', apparent_temperature: 'Pocit. tepl.', dew_point: 'Rosný bod', precipitation: 'Zrážky', precipitation_probability: 'Pr. zrážok', humidity: 'Vlhkosť', pressure: 'Tlak', wind_speed: 'Vietor', cloud_coverage: 'Oblačnosť', uv_index: 'UV' },
 };
 const DETAIL_ICONS = {
   humidity: 'mdi:water-percent', pressure: 'mdi:gauge',
@@ -3133,7 +3427,7 @@ const EDITOR_I18N = {
     appearance: 'Appearance',
     location: 'Location name (empty = automatic)',
     language: 'Language',
-    lang_system: 'System', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands', lang_fr: 'Français', lang_pl: 'Polski', lang_sv: 'Svenska', lang_pt: 'Português',
+    lang_system: 'System', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands', lang_fr: 'Français', lang_pl: 'Polski', lang_sv: 'Svenska', lang_pt: 'Português', lang_ru: 'Русский', lang_sk: 'Slovenčina',
     time_format: 'Time format',
     tf_24: '24 hours', tf_12: '12 hours',
     show_time: 'Show time',
@@ -3148,6 +3442,9 @@ const EDITOR_I18N = {
     background_image: 'Background image (URL or /local/… path)',
     background_css: 'Background colour / gradient (CSS)',
     light_text: 'Light text (for dark backgrounds)',
+    weather_background: 'Weather background', wb_none: 'None', wb_header: 'Header', wb_header_arc: 'Header + sun arc/bar', wb_full: 'Whole card',
+    wb_inset: 'Weather background inset (px)',
+    wb_animated: 'Animations',
     overlay: 'Overlay: lighter ⟵ none ⟶ darker',
     ov_lighter: 'Lighter', ov_zero: '0', ov_darker: 'Darker',
     forecast: 'Forecast',
@@ -3210,7 +3507,7 @@ const EDITOR_I18N = {
     appearance: 'Aspetto',
     location: 'Nome località (vuoto = automatico)',
     language: 'Lingua',
-    lang_system: 'Sistema', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands', lang_fr: 'Français', lang_pl: 'Polski', lang_sv: 'Svenska', lang_pt: 'Português',
+    lang_system: 'Sistema', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands', lang_fr: 'Français', lang_pl: 'Polski', lang_sv: 'Svenska', lang_pt: 'Português', lang_ru: 'Русский', lang_sk: 'Slovenčina',
     time_format: 'Formato ora',
     tf_24: '24 ore', tf_12: '12 ore',
     show_time: 'Mostra orario',
@@ -3225,6 +3522,9 @@ const EDITOR_I18N = {
     background_image: 'Immagine di sfondo (URL o percorso /local/…)',
     background_css: 'Colore / gradiente sfondo (CSS)',
     light_text: 'Testo chiaro (per sfondi scuri)',
+    weather_background: 'Sfondo meteo', wb_none: 'Nessuno', wb_header: 'Header', wb_header_arc: 'Header + arco/barra', wb_full: 'Tutta la card',
+    wb_inset: 'Margine sfondo meteo (px)',
+    wb_animated: 'Animazioni',
     overlay: 'Velo: più chiaro ⟵ niente ⟶ più scuro',
     ov_lighter: 'Chiaro', ov_zero: '0', ov_darker: 'Scuro',
     forecast: 'Previsioni',
@@ -3287,7 +3587,7 @@ const EDITOR_I18N = {
     appearance: 'Darstellung',
     location: 'Ortsname (leer = automatisch)',
     language: 'Sprache',
-    lang_system: 'System', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands', lang_fr: 'Français', lang_pl: 'Polski', lang_sv: 'Svenska', lang_pt: 'Português',
+    lang_system: 'System', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands', lang_fr: 'Français', lang_pl: 'Polski', lang_sv: 'Svenska', lang_pt: 'Português', lang_ru: 'Русский', lang_sk: 'Slovenčina',
     time_format: 'Zeitformat',
     tf_24: '24 Stunden', tf_12: '12 Stunden',
     show_time: 'Uhrzeit anzeigen',
@@ -3302,6 +3602,9 @@ const EDITOR_I18N = {
     background_image: 'Hintergrundbild (URL oder /local/…-Pfad)',
     background_css: 'Hintergrundfarbe / Verlauf (CSS)',
     light_text: 'Heller Text (für dunkle Hintergründe)',
+    weather_background: 'Wetter-Hintergrund', wb_none: 'Keiner', wb_header: 'Kopf', wb_header_arc: 'Kopf + Sonnenbogen/-leiste', wb_full: 'Ganze Karte',
+    wb_inset: 'Wetter-Hintergrund Einzug (px)',
+    wb_animated: 'Animationen',
     overlay: 'Überlagerung: heller ⟵ keine ⟶ dunkler',
     ov_lighter: 'Heller', ov_zero: '0', ov_darker: 'Dunkler',
     forecast: 'Vorhersage',
@@ -3364,7 +3667,7 @@ const EDITOR_I18N = {
     appearance: 'Weergave',
     location: 'Locatienaam (leeg = automatisch)',
     language: 'Taal',
-    lang_system: 'Systeem', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands', lang_fr: 'Français', lang_pl: 'Polski', lang_sv: 'Svenska', lang_pt: 'Português',
+    lang_system: 'Systeem', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands', lang_fr: 'Français', lang_pl: 'Polski', lang_sv: 'Svenska', lang_pt: 'Português', lang_ru: 'Русский', lang_sk: 'Slovenčina',
     time_format: 'Tijdnotatie',
     tf_24: '24 uur', tf_12: '12 uur',
     show_time: 'Tijd tonen',
@@ -3379,6 +3682,9 @@ const EDITOR_I18N = {
     background_image: 'Achtergrondafbeelding (URL of /local/…-pad)',
     background_css: 'Achtergrondkleur / verloop (CSS)',
     light_text: 'Lichte tekst (voor donkere achtergronden)',
+    weather_background: 'Weer-achtergrond', wb_none: 'Geen', wb_header: 'Koptekst', wb_header_arc: 'Koptekst + zonneboog/-balk', wb_full: 'Hele kaart',
+    wb_inset: 'Weer-achtergrond inspringing (px)',
+    wb_animated: 'Animaties',
     overlay: 'Overlay: lichter ⟵ geen ⟶ donkerder',
     ov_lighter: 'Lichter', ov_zero: '0', ov_darker: 'Donkerder',
     forecast: 'Voorspelling',
@@ -3441,7 +3747,7 @@ const EDITOR_I18N = {
     appearance: 'Apparence',
     location: 'Nom du lieu (vide = automatique)',
     language: 'Langue',
-    lang_system: 'Système', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands', lang_fr: 'Français', lang_pl: 'Polski', lang_sv: 'Svenska', lang_pt: 'Português',
+    lang_system: 'Système', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands', lang_fr: 'Français', lang_pl: 'Polski', lang_sv: 'Svenska', lang_pt: 'Português', lang_ru: 'Русский', lang_sk: 'Slovenčina',
     time_format: "Format de l'heure",
     tf_24: '24 heures', tf_12: '12 heures',
     show_time: "Afficher l'heure",
@@ -3456,6 +3762,9 @@ const EDITOR_I18N = {
     background_image: 'Image de fond (URL ou chemin /local/…)',
     background_css: 'Couleur / dégradé de fond (CSS)',
     light_text: 'Texte clair (pour fonds sombres)',
+    weather_background: 'Fond météo', wb_none: 'Aucun', wb_header: 'En-tête', wb_header_arc: 'En-tête + arc/barre solaire', wb_full: 'Toute la carte',
+    wb_inset: 'Marge du fond météo (px)',
+    wb_animated: 'Animations',
     overlay: 'Superposition : plus clair ⟵ aucun ⟶ plus foncé',
     ov_lighter: 'Plus clair', ov_zero: '0', ov_darker: 'Plus foncé',
     forecast: 'Prévision',
@@ -3518,7 +3827,7 @@ const EDITOR_I18N = {
     appearance: 'Wygląd',
     location: 'Nazwa lokalizacji (puste = automatycznie)',
     language: 'Język',
-    lang_system: 'System', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands', lang_fr: 'Français', lang_pl: 'Polski', lang_sv: 'Svenska', lang_pt: 'Português',
+    lang_system: 'System', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands', lang_fr: 'Français', lang_pl: 'Polski', lang_sv: 'Svenska', lang_pt: 'Português', lang_ru: 'Русский', lang_sk: 'Slovenčina',
     time_format: 'Format czasu',
     tf_24: '24 godziny', tf_12: '12 godzin',
     show_time: 'Pokaż godzinę',
@@ -3533,6 +3842,9 @@ const EDITOR_I18N = {
     background_image: 'Obraz tła (URL lub ścieżka /local/…)',
     background_css: 'Kolor / gradient tła (CSS)',
     light_text: 'Jasny tekst (dla ciemnych teł)',
+    weather_background: 'Tło pogodowe', wb_none: 'Brak', wb_header: 'Nagłówek', wb_header_arc: 'Nagłówek + łuk/pasek słońca', wb_full: 'Cała karta',
+    wb_inset: 'Margines tła pogodowego (px)',
+    wb_animated: 'Animacje',
     overlay: 'Nakładka: jaśniej ⟵ brak ⟶ ciemniej',
     ov_lighter: 'Jaśniej', ov_zero: '0', ov_darker: 'Ciemniej',
     forecast: 'Prognoza',
@@ -3595,7 +3907,7 @@ const EDITOR_I18N = {
     appearance: 'Utseende',
     location: 'Platsnamn (tomt = automatiskt)',
     language: 'Språk',
-    lang_system: 'System', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands', lang_fr: 'Français', lang_pl: 'Polski', lang_sv: 'Svenska', lang_pt: 'Português',
+    lang_system: 'System', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands', lang_fr: 'Français', lang_pl: 'Polski', lang_sv: 'Svenska', lang_pt: 'Português', lang_ru: 'Русский', lang_sk: 'Slovenčina',
     time_format: 'Tidsformat',
     tf_24: '24 timmar', tf_12: '12 timmar',
     show_time: 'Visa tid',
@@ -3610,6 +3922,9 @@ const EDITOR_I18N = {
     background_image: 'Bakgrundsbild (URL eller /local/…-sökväg)',
     background_css: 'Bakgrundsfärg / gradient (CSS)',
     light_text: 'Ljus text (för mörka bakgrunder)',
+    weather_background: 'Väderbakgrund', wb_none: 'Ingen', wb_header: 'Rubrik', wb_header_arc: 'Rubrik + solbåge/-stapel', wb_full: 'Hela kortet',
+    wb_inset: 'Väderbakgrund marginal (px)',
+    wb_animated: 'Animationer',
     overlay: 'Överlägg: ljusare ⟵ inget ⟶ mörkare',
     ov_lighter: 'Ljusare', ov_zero: '0', ov_darker: 'Mörkare',
     forecast: 'Prognos',
@@ -3672,7 +3987,7 @@ const EDITOR_I18N = {
     appearance: 'Aparência',
     location: 'Nome da localização (vazio = automático)',
     language: 'Idioma',
-    lang_system: 'Sistema', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands', lang_fr: 'Français', lang_pl: 'Polski', lang_sv: 'Svenska', lang_pt: 'Português',
+    lang_system: 'Sistema', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands', lang_fr: 'Français', lang_pl: 'Polski', lang_sv: 'Svenska', lang_pt: 'Português', lang_ru: 'Русский', lang_sk: 'Slovenčina',
     time_format: 'Formato da hora',
     tf_24: '24 horas', tf_12: '12 horas',
     show_time: 'Mostrar hora',
@@ -3687,6 +4002,9 @@ const EDITOR_I18N = {
     background_image: 'Imagem de fundo (URL ou caminho /local/…)',
     background_css: 'Cor / gradiente de fundo (CSS)',
     light_text: 'Texto claro (para fundos escuros)',
+    weather_background: 'Fundo meteorológico', wb_none: 'Nenhum', wb_header: 'Cabeçalho', wb_header_arc: 'Cabeçalho + arco/barra do sol', wb_full: 'Cartão inteiro',
+    wb_inset: 'Margem do fundo meteorológico (px)',
+    wb_animated: 'Animações',
     overlay: 'Sobreposição: mais clara ⟵ nenhuma ⟶ mais escura',
     ov_lighter: 'Mais clara', ov_zero: '0', ov_darker: 'Mais escura',
     forecast: 'Previsão',
@@ -3740,6 +4058,166 @@ const EDITOR_I18N = {
     det_sunset: 'Pôr do sol', det_visibility: 'Visibilidade',
     det_apparent_temperature: 'Sensação térmica', det_cloud_coverage: 'Nebulosidade',
     det_uv_index: 'Índice UV', det_dew_point: 'Ponto de orvalho',
+  },
+  ru: {
+    entities: 'Сущности',
+    weather_entity: 'Сущность погоды',
+    sun_entity: 'Сущность солнца (дуга восхода/заката)',
+    current_temp_entity: 'Текущая температура — внешний датчик (опционально)',
+    appearance: 'Внешний вид',
+    location: 'Название местоположения (пусто = автоматически)',
+    language: 'Язык',
+    lang_system: 'Системный', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands', lang_fr: 'Français', lang_pl: 'Polski', lang_sv: 'Svenska', lang_pt: 'Português', lang_ru: 'Русский', lang_sk: 'Slovenčina',
+    time_format: 'Формат времени',
+    tf_24: '24 часа', tf_12: '12 часов',
+    show_time: 'Показывать время',
+    show_date: 'Показывать дату',
+    show_arc: 'Показывать дугу солнца',
+    sun_style: 'Отображение солнца', ss_arc: 'Дуга', ss_bar: 'Полоса', ss_none: 'Нет',
+    sun_countdown: 'Обратный отсчёт до восхода/заката',
+    current_temp_decimals: 'Десятичные знаки текущей температуры', ctd_0: 'Целое (17°)', ctd_1: 'Один знак (16,5°)',
+    animated_icons: 'Анимированные иконки',
+    transparent: 'Прозрачный фон',
+    background: 'Фон',
+    weather_background: 'Погодный фон', wb_none: 'Нет', wb_header: 'Шапка', wb_header_arc: 'Шапка + дуга солнца', wb_full: 'Вся карточка',
+    wb_inset: 'Отступ погодного фона (px)',
+    wb_animated: 'Анимация',
+    background_image: 'Фоновое изображение (URL или путь /local/…)',
+    background_css: 'Цвет / градиент фона (CSS)',
+    light_text: 'Светлый текст (для тёмного фона)',
+    overlay: 'Затемнение: светлее ⟵ нет ⟶ темнее',
+    ov_lighter: 'Светлее', ov_zero: '0', ov_darker: 'Темнее',
+    forecast: 'Прогноз',
+    forecast_type: 'Тип прогноза',
+    ft_daily: 'По дням', ft_hourly: 'По часам',
+    daily_layout: 'Вид прогноза по дням',
+    dl_bars: 'Полосы', dl_graph: 'График (линии)', dl_none: 'Нет', dl_compact: 'Компактный',
+    forecast_temp_decimals: 'Десятичные знаки температуры прогноза', ftd_0: 'Целое (22°)', ftd_1: 'Один знак (22,4°)',
+    color_by_value: 'Динамический цвет (полосы и график)',
+    graph_precip_bars: 'Показывать осадки столбиками на графике',
+    forecast_attribute: 'Атрибут прогноза', ga_temperature: 'Температура',
+    show_forecast_attribute_toggle: 'Показывать переключатель атрибутов в карточке',
+    forecast_attribute_toggle_style: 'Стиль переключателя', gats_dropdown: 'Выпадающий список', gats_chips: 'Чипы',
+    forecast_attributes: 'Другие доступные атрибуты (по умолчанию всегда включён)',
+    days_to_load: 'Дней для загрузки',
+    hours_to_load: 'Часов для загрузки',
+    visible_rows: 'Видимых дней (пусто = все)',
+    show_rain: 'Показывать осадки за день (мм)',
+    show_toggle: 'Переключатель Дни/Часы в карточке',
+    details: 'Подробности',
+    details_hint: 'Добавьте атрибуты в сетку. Используйте ▲▼ для перемещения и корзину для удаления.',
+    custom_sensors: 'Пользовательские датчики',
+    custom_sensors_hint: 'Отображение любых датчиков в сетке подробностей. Выберите датчик и при необходимости укажите имя и иконку.',
+    show_sensor_names: 'Показывать названия под датчиками',
+    cs_fit_text: 'По ширине текста',
+    add_sensor: 'Добавить датчик',
+    cs_entity: 'Сущность датчика',
+    cs_attribute: 'Атрибут (опционально)',
+    cs_pick: 'Выберите датчик…',
+    cs_name: 'Название (опционально)',
+    cs_name_ph: 'напр. Надёжность',
+    cs_icon: 'Иконка (опционально)',
+    cs_decimals: 'Десятичные знаки (опционально)',
+    cs_title: 'Датчик',
+    cs_remove: 'Удалить',
+    cs_empty: 'Пока нет пользовательских датчиков.',
+    details_empty: 'Пока нет подробностей. Добавьте атрибуты ниже.',
+    all_added: '— всё добавлено —',
+    interaction: 'Взаимодействие',
+    tap_behavior: 'Действие при касании',
+    hold_behavior: 'Действие при удержании',
+    double_tap_behavior: 'Действие при двойном касании',
+    nav_path: 'Путь навигации',
+    url_label: 'URL',
+    action_srv: 'Действие (domain.service)',
+    act_more_info: 'Информация о сущности', act_navigate: 'Перейти', act_url: 'URL',
+    act_perform: 'Выполнить действие', act_toggle: 'Переключить', act_none: 'Ничего',
+    det_humidity: 'Влажность', det_pressure: 'Давление', det_wind_speed: 'Скорость ветра',
+    det_wind_bearing: 'Направление ветра', det_wind: 'Ветер (скорость + направление)', det_precipitation: 'Осадки (мм)',
+    det_precipitation_probability: 'Вероятность осадков', det_sunrise: 'Восход',
+    det_sunset: 'Закат', det_visibility: 'Видимость',
+    det_apparent_temperature: 'Ощущаемая темп.', det_cloud_coverage: 'Облачность',
+    det_uv_index: 'УФ-индекс', det_dew_point: 'Точка росы',
+  },
+  sk: {
+    entities: 'Entity',
+    weather_entity: 'Entita počasia',
+    sun_entity: 'Entita slnka (oblúk východu/západu)',
+    current_temp_entity: 'Aktuálna teplota — vonkajší senzor (voliteľné)',
+    appearance: 'Vzhľad',
+    location: 'Názov miesta (prázdne = automaticky)',
+    language: 'Jazyk',
+    lang_system: 'Systém', lang_it: 'Italiano', lang_en: 'English', lang_de: 'Deutsch', lang_nl: 'Nederlands', lang_fr: 'Français', lang_pl: 'Polski', lang_sv: 'Svenska', lang_pt: 'Português', lang_ru: 'Русский', lang_sk: 'Slovenčina',
+    time_format: 'Formát času',
+    tf_24: '24 hodín', tf_12: '12 hodín',
+    show_time: 'Zobraziť čas',
+    show_date: 'Zobraziť dátum',
+    show_arc: 'Zobraziť oblúk slnka',
+    sun_style: 'Zobrazenie slnka', ss_arc: 'Oblúk', ss_bar: 'Pruh', ss_none: 'Žiadne',
+    sun_countdown: 'Odpočet do východu/západu slnka',
+    current_temp_decimals: 'Desatinné miesta aktuálnej teploty', ctd_0: 'Celé číslo (17°)', ctd_1: 'Jedno desatinné miesto (16,5°)',
+    animated_icons: 'Animované ikony',
+    transparent: 'Priehľadné pozadie',
+    background: 'Pozadie',
+    background_image: 'Obrázok pozadia (URL alebo cesta /local/…)',
+    background_css: 'Farba / prechod pozadia (CSS)',
+    light_text: 'Svetlý text (pre tmavé pozadie)',
+    weather_background: 'Pozadie počasia', wb_none: 'Žiadne', wb_header: 'Hlavička', wb_header_arc: 'Hlavička + oblúk/pruh', wb_full: 'Celá karta',
+    wb_inset: 'Odsadenie pozadia počasia (px)',
+    wb_animated: 'Animácie',
+    overlay: 'Prekrytie: svetlejšie ⟵ žiadne ⟶ tmavšie',
+    ov_lighter: 'Svetlejšie', ov_zero: '0', ov_darker: 'Tmavšie',
+    forecast: 'Predpoveď',
+    forecast_type: 'Typ predpovede',
+    ft_daily: 'Denná', ft_hourly: 'Hodinová',
+    daily_layout: 'Rozloženie dennej predpovede',
+    dl_bars: 'Pruhy', dl_graph: 'Graf (čiary)', dl_none: 'Žiadne', dl_compact: 'Kompaktné',
+    forecast_temp_decimals: 'Desatinné miesta teploty predpovede', ftd_0: 'Celé čísla (22°)', ftd_1: 'Jedno desatinné miesto (22,4°)',
+    color_by_value: 'Dynamická farba (pruhy a graf)',
+    graph_precip_bars: 'Zobraziť zrážky ako pruhy v grafe',
+    forecast_attribute: 'Atribút predpovede', ga_temperature: 'Teplota',
+    show_forecast_attribute_toggle: 'Zobraziť výber atribútu v karte',
+    forecast_attribute_toggle_style: 'Štýl výberu', gats_dropdown: 'Rozbaľovací zoznam', gats_chips: 'Tlačidlá (Chips)',
+    forecast_attributes: 'Ďalšie dostupné atribúty (predvolený je vždy zahrnutý)',
+    days_to_load: 'Počet dní na načítanie',
+    hours_to_load: 'Počet hodín na načítanie',
+    visible_rows: 'Viditeľné dni (prázdne = všetky)',
+    show_rain: 'Zobraziť denné zrážky (mm)',
+    show_toggle: 'Prepínač Denná/Hodinová v karte',
+    details: 'Podrobnosti',
+    details_hint: 'Pridajte atribúty do mriežky podrobností. Použite ▲▼ na presun, kôš na odstránenie.',
+    custom_sensors: 'Vlastné senzory',
+    custom_sensors_hint: 'Zobrazte ľubovoľný senzor v mriežke podrobností. Vyberte senzor a voliteľne nastavte názov a ikonu.',
+    show_sensor_names: 'Zobraziť názvy pod senzormi',
+    cs_fit_text: 'Prispôsobiť textu',
+    add_sensor: 'Pridať senzor',
+    cs_entity: 'Entita senzora',
+    cs_attribute: 'Atribút (voliteľné)',
+    cs_pick: 'Vyberte senzor…',
+    cs_name: 'Názov (voliteľné)',
+    cs_name_ph: 'napr. Spoľahlivosť',
+    cs_icon: 'Ikona (voliteľné)',
+    cs_decimals: 'Desatinné miesta (voliteľné)',
+    cs_title: 'Senzor',
+    cs_remove: 'Odstrániť',
+    cs_empty: 'Zatiaľ žiadne vlastné senzory.',
+    details_empty: 'Zatiaľ žiadne podrobnosti. Pridajte atribúty nižšie.',
+    all_added: '— všetky pridané —',
+    interaction: 'Interakcia',
+    tap_behavior: 'Akcia pri ťuknutí',
+    hold_behavior: 'Akcia pri podržaní',
+    double_tap_behavior: 'Akcia pri dvojitom ťuknutí',
+    nav_path: 'Cesta navigácie',
+    url_label: 'URL',
+    action_srv: 'Akcia (doména.akcia)',
+    act_more_info: 'Informácie o entite', act_navigate: 'Prejsť', act_url: 'URL',
+    act_perform: 'Vykonať akciu', act_toggle: 'Prepnúť', act_none: 'Nič',
+    det_humidity: 'Vlhkosť', det_pressure: 'Tlak', det_wind_speed: 'Rýchlosť vetra',
+    det_wind_bearing: 'Smer vetra', det_wind: 'Vietor (rýchlosť + smer)', det_precipitation: 'Zrážky (mm)',
+    det_precipitation_probability: 'Pravdepodobnosť zrážok', det_sunrise: 'Východ slnka',
+    det_sunset: 'Západ slnka', det_visibility: 'Viditeľnosť',
+    det_apparent_temperature: 'Pocitová tepl.', det_cloud_coverage: 'Oblačnosť',
+    det_uv_index: 'UV index', det_dew_point: 'Rosný bod',
   },
 };
 
@@ -3944,18 +4422,32 @@ class SunWeatherCardEditor extends HTMLElement {
     const form = document.createElement('ha-form');
     form.hass = this._hass;
     form.data = {
+      weather_background: c.weather_background || 'none',
+      weather_background_inset: c.weather_background_inset || 0,
+      weather_background_animated: c.weather_background_animated === true,
       transparent: c.transparent === true,
       background_image: c.background_image || '',
       background_css: c.background_css || '',
       light_text: c.light_text === true,
     };
     form.schema = [
+      { name: 'weather_background', selector: { select: { mode: 'dropdown', options: [
+        { value: 'none', label: this.t('wb_none') },
+        { value: 'header', label: this.t('wb_header') },
+        { value: 'header_arc', label: this.t('wb_header_arc') },
+        { value: 'full', label: this.t('wb_full') },
+      ] } } },
+      { name: 'weather_background_inset', selector: { number: { min: 0, max: 40, step: 1, mode: 'box' } } },
+      { name: 'weather_background_animated', selector: { boolean: {} } },
       { name: 'transparent', selector: { boolean: {} } },
       { name: 'background_image', selector: { text: {} } },
       { name: 'background_css', selector: { text: {} } },
       { name: 'light_text', selector: { boolean: {} } },
     ];
     const labels = {
+      weather_background: this.t('weather_background'),
+      weather_background_inset: this.t('wb_inset'),
+      weather_background_animated: this.t('wb_animated'),
       transparent: this.t('transparent'),
       background_image: this.t('background_image'),
       background_css: this.t('background_css'),
@@ -3964,6 +4456,9 @@ class SunWeatherCardEditor extends HTMLElement {
     form.computeLabel = (s) => labels[s.name] || s.name;
     form.addEventListener('value-changed', (e) => {
       const v = e.detail.value || {};
+      this._set('weather_background', (v.weather_background && v.weather_background !== 'none') ? v.weather_background : undefined);
+      this._set('weather_background_inset', Number(v.weather_background_inset) > 0 ? Number(v.weather_background_inset) : undefined);
+      this._set('weather_background_animated', v.weather_background_animated === true ? true : undefined);
       // transparent e light_text spenti di default -> salva solo se true
       this._set('transparent', v.transparent === true ? true : undefined);
       this._set('background_image', v.background_image || undefined);
