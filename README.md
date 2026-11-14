@@ -47,6 +47,19 @@ Most weather cards on HACS show the forecast as a plain list. This card focuses 
 
 ## 📸 Screenshots
 
+### Weather background & animations
+
+| | |
+|:---:|:---:|
+| <img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/bg-sunny.gif" width="300" /> | <img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/bg-clear-night.gif" width="300" /> |
+| Day — Sunny | Night — Clear |
+| <img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/bg-rainy.gif" width="300" /> | <img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/bg-thunderstorm.gif" width="300" /> |
+| Rainy | Thunderstorm |
+| <img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/bg-snow.gif" width="300" /> | <img src="https://raw.githubusercontent.com/korova-sq/sun-weather-card/main/images/bg-cloudy.gif" width="300" /> |
+| Snow | Cloudy |
+
+*The background covers every weather condition HA reports (fog, hail, windy, snowy-rainy, lightning-rainy…), with day/night variants where it makes sense.*
+
 ### Forecast — bars
 
 | | |
