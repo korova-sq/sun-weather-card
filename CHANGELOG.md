@@ -3,6 +3,14 @@
 All notable changes to this project are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.14.1]
+
+### Fixed
+- Improved text and control readability over weather backgrounds, especially in
+  `full` mode: sun arc, horizon line and countdown are now light on dark skies,
+  detail icons and inactive attribute chips get proper contrast, and a subtle
+  text shadow is added over the sky area. Thanks @Barma-lej (#20).
+
 ## [1.14.0]
 
 ### Added
