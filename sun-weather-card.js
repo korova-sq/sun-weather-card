@@ -427,6 +427,8 @@ class SunWeatherCard extends HTMLElement {
         ha-card.bg-dark .date,
         ha-card.bg-dark .cur-location,
         ha-card.bg-dark .cur-hilo,
+        ha-card.bg-dark .custom-item .cd-row,
+        ha-card.bg-dark .custom-item .cd-name,
         ha-card.bg-dark .detail-item,
         ha-card.bg-dark .forecast-row,
         ha-card.bg-dark .forecast-row .label,
@@ -905,14 +907,45 @@ class SunWeatherCard extends HTMLElement {
         ha-card.sky-light-top .time, ha-card.sky-light-top .date,
         ha-card.sky-light-top .cur-desc, ha-card.sky-light-top .cur-location,
         ha-card.sky-light-top .cur-temp, ha-card.sky-light-top .cur-hilo { color: #ffffff; }
-        ha-card.sky-light-arc .sun-time-label, ha-card.sky-light-arc .sun-time-sub { fill: #ffffff; }
-        ha-card.sky-light-arc .arc-path { stroke: rgba(255,255,255,0.6); }
+        /* Shared contrast rules for text over the weather sky. */
+        ha-card.has-sky {
+          --swc-sky-text-shadow: 0 1px 2px rgba(0,0,0,0.65), 0 0 5px rgba(0,0,0,0.3);
+        }
+        ha-card.has-sky:is(.sky-light-top, .bg-dark) :is(.header, .current),
+        ha-card.has-sky.bg-dark :is(
+          .detail-item, .custom-item .cd-row, .custom-item .cd-name,
+          .forecast-row .label, .forecast-row .temp-min, .forecast-row .temp-max,
+          .compact-col .c-day, .compact-col .c-max, .compact-col .c-min,
+          .fc-graph .g-day, .fc-graph .g-tmax, .fc-graph .g-tmin
+        ) {
+          text-shadow: var(--swc-sky-text-shadow);
+        }
+        ha-card.has-sky:is(.sky-light-arc, .bg-dark) :is(
+          .sun-time-label, .sun-time-sub, .sun-countdown
+        ) {
+          fill: #ffffff;
+          opacity: 1;
+          text-shadow: var(--swc-sky-text-shadow);
+        }
+        ha-card.has-sky.bg-dark :is(.detail-item, .custom-item .cd-row) ha-icon {
+          color: #ffffff;
+        }
+        ha-card.has-sky.bg-dark :is(.attr-chip:not(.active), .forecast-toggle) {
+          background: rgba(0,0,0,0.38);
+        }
+        ha-card.has-sky.bg-dark :is(.attr-chip, .forecast-toggle button):not(.active) {
+          color: #ffffff;
+          text-shadow: var(--swc-sky-text-shadow);
+        }
+        ha-card.has-sky:is(.sky-light-arc, .bg-dark) .arc-path {
+          stroke: rgba(255,255,255,0.6);
+        }
         /* su cielo scuro schiarisci anche la linea orizzonte e la barra del sole */
-        ha-card.sky-light-arc .horizon-line,
-        ha-card.sky-light-arc .sun-bar-track { stroke: rgba(255,255,255,0.5); opacity: 1; }
+        ha-card.has-sky:is(.sky-light-arc, .bg-dark) .horizon-line,
+        ha-card.has-sky:is(.sky-light-arc, .bg-dark) .sun-bar-track { stroke: rgba(255,255,255,0.5); opacity: 1; }
         /* su cielo chiaro (neve/nebbia) attenuala invece di schiarirla */
-        ha-card.sky-over-details:not(.sky-light-arc) .horizon-line,
-        ha-card.sky-over-details:not(.sky-light-arc) .sun-bar-track { opacity: 0.18; }
+        ha-card.sky-over-details:not(.sky-light-arc):not(.bg-dark) .horizon-line,
+        ha-card.sky-over-details:not(.sky-light-arc):not(.bg-dark) .sun-bar-track { opacity: 0.18; }
         /* se la coda del cielo copre i dettagli, togli il bordo-separatore */
         ha-card.sky-over-details .details,
         ha-card.sky-over-details .forecast-list { border-top-color: transparent; }
