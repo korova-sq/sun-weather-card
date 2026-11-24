@@ -1,7 +1,7 @@
 /**
  * Sun Weather Card
  * https://github.com/korova-sq/sun-weather-card
- * Version: 1.14.1
+ * Version: 1.15.0
  *
  * A weather card with an animated current-conditions header, a sunrise/sunset
  * arc, and daily/hourly forecasts shown as iOS-style bars or a line graph.
@@ -30,7 +30,7 @@
 // Versione della card: unico punto da aggiornare a ogni release (il banner in
 // console la legge da qui). Ricordarsi di allineare anche il commento "Version:"
 // in testa al file.
-const CARD_VERSION = '1.14.1';
+const CARD_VERSION = '1.15.0';
 
 // Lingue supportate: codice card -> locale usato per date/orari.
 const SUPPORTED_LANGS = {
@@ -1531,6 +1531,7 @@ class SunWeatherCard extends HTMLElement {
       rain:     { bg: 'linear-gradient(175deg,#3c4857 0%,#566374 55%,#7c8a99 100%)', light: true },
       storm:    { bg: 'linear-gradient(175deg,#191d2b 0%,#363c54 50%,#565b73 100%)', light: true },
       snow:     { bg: 'linear-gradient(175deg,#9fb0c2 0%,#c6d2de 55%,#eef3f8 100%)', light: false },
+      sleet:    { bg: 'linear-gradient(175deg,#6e7c8c 0%,#8c99a8 55%,#b3bec9 100%)', light: true },
       fog:      { bg: 'linear-gradient(175deg,#9aa0a8 0%,#bcc2c8 55%,#dde1e5 100%)', light: false },
     };
     const clear = cond === 'sunny' || cond === 'clear-night'
@@ -1542,7 +1543,8 @@ class SunWeatherCard extends HTMLElement {
       case 'partlycloudy': return night ? G.partlyN : G.partly;
       case 'partlycloudy-night': return G.partlyN;
       case 'cloudy': return night ? G.cloudyN : G.cloudy;
-      case 'rainy': case 'pouring': case 'hail': case 'snowy-rainy': return G.rain;
+      case 'rainy': case 'pouring': case 'hail': return G.rain;
+      case 'snowy-rainy': return G.sleet;
       case 'lightning': case 'lightning-rainy': return G.storm;
       case 'snowy': return G.snow;
       case 'fog': return G.fog;
@@ -1569,12 +1571,16 @@ class SunWeatherCard extends HTMLElement {
     const f = (x) => x.toFixed(2);
     const P = [];
     const drops = (n) => { for (let i = 0; i < n; i++) P.push(`<span class="wfx-drop" style="left:${f(rnd(0, 100))}%;height:${f(rnd(10, 20))}px;animation-duration:${f(rnd(0.45, 0.9))}s;animation-delay:${f(rnd(0, 1))}s;opacity:${f(rnd(0.4, 0.9))}"></span>`); };
-    if (cond === 'rainy' || cond === 'pouring' || cond === 'hail' || cond === 'snowy-rainy') {
+    if (cond === 'rainy' || cond === 'pouring' || cond === 'hail') {
       drops(46);
     } else if (cond === 'lightning' || cond === 'lightning-rainy') {
       drops(38); P.push('<span class="wfx-bolt"></span>');
     } else if (cond === 'snowy') {
       for (let i = 0; i < 34; i++) { const z = f(rnd(3, 6)); P.push(`<span class="wfx-flake" style="left:${f(rnd(0, 100))}%;width:${z}px;height:${z}px;animation-duration:${f(rnd(4, 9))}s;animation-delay:${f(rnd(0, 5))}s;opacity:${f(rnd(0.5, 0.95))}"></span>`); }
+    } else if (cond === 'snowy-rainy') {
+      // nevischio: mix di gocce e fiocchi, meno densi del solo rain/snow
+      drops(22);
+      for (let i = 0; i < 18; i++) { const z = f(rnd(3, 5.5)); P.push(`<span class="wfx-flake" style="left:${f(rnd(0, 100))}%;width:${z}px;height:${z}px;animation-duration:${f(rnd(4, 9))}s;animation-delay:${f(rnd(0, 5))}s;opacity:${f(rnd(0.5, 0.95))}"></span>`); }
     } else if (cond === 'clear-night') {
       for (let i = 0; i < 40; i++) { const z = f(rnd(1, 2.6)); P.push(`<span class="wfx-star" style="left:${f(rnd(2, 98))}%;top:${f(rnd(6, 80))}%;width:${z}px;height:${z}px;animation-duration:${f(rnd(1.4, 3.2))}s;animation-delay:${f(rnd(0, 3))}s"></span>`); }
       // niente luna decorativa: l'icona della condizione fa gia' la luna
@@ -2266,6 +2272,13 @@ class SunWeatherCard extends HTMLElement {
   }
 
   async _fetchForecast(type) {
+    // Evita di invocare get_forecasts prima che l'entita' esista o sia pronta:
+    // al restart di HA la card riceve raffiche di eventi state_changed mentre
+    // integrazioni lente (es. Google Weather) devono ancora caricare, e ogni
+    // chiamata fallita finisce nel log (#21). Qui ritorniamo null, cosi' il
+    // chiamante lascia la cache a null e ritentera' al prossimo update.
+    const st = this._hass.states[this._config.entity];
+    if (!st || st.state === 'unavailable' || st.state === 'unknown') return null;
     try {
       const response = await this._hass.callWS({
         type: 'call_service',
@@ -2291,19 +2304,38 @@ class SunWeatherCard extends HTMLElement {
     const now = Date.now();
     const CACHE = 20 * 60 * 1000;
 
-    // il daily serve sempre (intestazione max/min + dettagli di oggi)
-    if (!this._daily || now - this._dailyFetchedAt >= CACHE) {
-      this._dailyFetchedAt = now;
-      this._daily = await this._fetchForecast('daily');
-      this._renderCurrent(new Date());
-      this._renderDetails();
+    // il daily serve sempre (intestazione max/min + dettagli di oggi).
+    // _dailyFetching e' un lock contro chiamate concorrenti: senza, al restart
+    // di HA le raffiche di state_changed lanciano una callWS per ogni evento
+    // mentre la prima non e' ancora tornata (#21).
+    if (!this._dailyFetching && (!this._daily || now - this._dailyFetchedAt >= CACHE)) {
+      this._dailyFetching = true;
+      try {
+        const data = await this._fetchForecast('daily');
+        if (data !== null) {
+          this._daily = data;
+          this._dailyFetchedAt = now;
+          this._renderCurrent(new Date());
+          this._renderDetails();
+        }
+      } finally {
+        this._dailyFetching = false;
+      }
     }
 
     // l'hourly si carica solo quando serve
-    if (this._forecastMode === 'hourly'
+    if (!this._hourlyFetching && this._forecastMode === 'hourly'
         && (!this._hourly || now - this._hourlyFetchedAt >= CACHE)) {
-      this._hourlyFetchedAt = now;
-      this._hourly = await this._fetchForecast('hourly');
+      this._hourlyFetching = true;
+      try {
+        const data = await this._fetchForecast('hourly');
+        if (data !== null) {
+          this._hourly = data;
+          this._hourlyFetchedAt = now;
+        }
+      } finally {
+        this._hourlyFetching = false;
+      }
     }
 
     this._updateToggleUI();
@@ -3110,7 +3142,7 @@ class SunWeatherCard extends HTMLElement {
       pouring: () => this._iconRain(uid, size, 5),
       hail: () => this._iconHail(uid, size),
       snowy: () => this._iconSnow(uid, size),
-      'snowy-rainy': () => this._iconSnow(uid, size),
+      'snowy-rainy': () => this._iconSleet(uid, size),
       lightning: () => this._iconLightning(uid, size, false),
       'lightning-rainy': () => this._iconLightning(uid, size, true),
       exceptional: () => this._iconExceptional(uid, size),
@@ -3289,9 +3321,46 @@ class SunWeatherCard extends HTMLElement {
     `;
   }
 
+  // Nevischio / neve mista a pioggia (snowy-rainy):
+  // 4 elementi alternati -- neve, pioggia, pioggia, neve -- con i fiocchi
+  // leggermente piu' scuri rispetto a _iconSnow per distinguersi dalla neve
+  // pura, e la pioggia che cade (traslazione verticale + fade).
+  _iconSleet(uid, size) {
+    return `
+      <svg viewBox="0 0 24 24" width="${size}" height="${size}">
+        <path d="${this._cloudPath()}" fill="#b8c2d0" transform="translate(0,-3)"/>
+        <circle cx="6" cy="13" r="1.2" fill="#d6e0ec" opacity="0">
+          <animate attributeName="opacity" values="0;1;0" dur="2.6s" begin="0s" repeatCount="indefinite"/>
+          <animateTransform attributeName="transform" type="translate" values="0 -2;2 6" dur="2.6s" begin="0s" repeatCount="indefinite"/>
+        </circle>
+        <line x1="10" y1="12" x2="8.5" y2="17" stroke="#4d9de0" stroke-width="1.5" stroke-linecap="round" opacity="0">
+          <animate attributeName="opacity" values="0;0.9;0.9;0" dur="1.2s" begin="0.6s" repeatCount="indefinite"/>
+          <animateTransform attributeName="transform" type="translate" values="0 -4;0 3" dur="1.2s" begin="0.6s" repeatCount="indefinite"/>
+        </line>
+        <line x1="14" y1="12" x2="12.5" y2="17" stroke="#4d9de0" stroke-width="1.5" stroke-linecap="round" opacity="0">
+          <animate attributeName="opacity" values="0;0.9;0.9;0" dur="1.2s" begin="1.2s" repeatCount="indefinite"/>
+          <animateTransform attributeName="transform" type="translate" values="0 -4;0 3" dur="1.2s" begin="1.2s" repeatCount="indefinite"/>
+        </line>
+        <circle cx="18" cy="13" r="1.2" fill="#d6e0ec" opacity="0">
+          <animate attributeName="opacity" values="0;1;0" dur="2.6s" begin="1.3s" repeatCount="indefinite"/>
+          <animateTransform attributeName="transform" type="translate" values="0 -2;2 6" dur="2.6s" begin="1.3s" repeatCount="indefinite"/>
+        </circle>
+      </svg>
+    `;
+  }
+
   _iconLightning(uid, size, withRain) {
+    // Con withRain: 2 gocce a sinistra del lampo, che cadono (opacita' + traslazione)
+    // invece di una sola goccia statica come nella versione precedente.
     const rain = withRain ? `
-      <line x1="7" y1="14" x2="5.5" y2="18" stroke="#4d9de0" stroke-width="1.4" stroke-linecap="round" opacity="0.7"/>
+      <line x1="6.5" y1="12" x2="5" y2="17" stroke="#4d9de0" stroke-width="1.6" stroke-linecap="round" opacity="0">
+        <animate attributeName="opacity" values="0;0.9;0.9;0" dur="1.2s" begin="0s" repeatCount="indefinite"/>
+        <animateTransform attributeName="transform" type="translate" values="0 -4;0 3" dur="1.2s" begin="0s" repeatCount="indefinite"/>
+      </line>
+      <line x1="9" y1="12" x2="7.5" y2="17" stroke="#4d9de0" stroke-width="1.6" stroke-linecap="round" opacity="0">
+        <animate attributeName="opacity" values="0;0.9;0.9;0" dur="1.2s" begin="0.4s" repeatCount="indefinite"/>
+        <animateTransform attributeName="transform" type="translate" values="0 -4;0 3" dur="1.2s" begin="0.4s" repeatCount="indefinite"/>
+      </line>
     ` : '';
     return `
       <svg viewBox="0 0 24 24" width="${size}" height="${size}">

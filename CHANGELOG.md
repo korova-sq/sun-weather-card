@@ -3,6 +3,26 @@
 All notable changes to this project are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.15.0]
+
+### Added
+- **Dedicated icons and sky for `snowy-rainy` and `lightning-rainy`** — sleet
+  and thunderstorm-with-rain now have their own animated icons instead of
+  falling back to the plain `snow` and `lightning` ones. Sleet alternates
+  snowflakes and falling rain drops; the thunderstorm shows two raindrops
+  falling next to the lightning bolt. Sleet also gets its own in-between sky
+  background (between snow and rain) with a mix of snowflakes and drops in
+  the animated weather background. Requested by @rw39752178 (#22).
+
+### Fixed
+- The card no longer floods the Home Assistant log with
+  `weather.get_forecasts` errors at startup. The `hass` setter was firing a
+  fresh service call on every state-change burst while the weather
+  integration was still loading, launching hundreds of parallel calls that
+  all failed. The card now skips the call while the weather entity is
+  missing / `unavailable` / `unknown`, and uses an in-flight lock to prevent
+  concurrent calls. Reported and verified by @Thomptronics (#21).
+
 ## [1.14.1]
 
 ### Fixed
